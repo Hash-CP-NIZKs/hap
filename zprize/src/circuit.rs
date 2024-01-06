@@ -1,9 +1,13 @@
+use anyhow::Context;
+use snarkvm_circuit::environment::Circuit;
 use snarkvm_circuit_environment::{prelude::PrimeField, Eject, Environment, Inject, Mode};
 use snarkvm_console_network::prelude::Itertools;
 use snarkvm_utilities::biginteger::BigInteger;
 
 // TODO: better to use AleoV0 or Circuit?
 use snarkvm_circuit::{Circuit as Env, Field};
+
+use crate::{console, r1cs_provider};
 //use snarkvm_circuit::{AleoV0 as Env, Field};
 
 //
@@ -196,9 +200,22 @@ impl Eject for ECDSASignature {
 //
 
 /// Verifies a single ECDSA signature on a message.
-pub fn verify_one(_public_key: ECDSAPublicKey, _signature: ECDSASignature, msg: Message) {
-    // If we don't have constraints Varuna will panic.
-    // So here are some dummy constraints to make the code compile & run.
-    let res = msg.bytes[0].clone() + msg.bytes[1].clone();
-    Env::assert_eq(res.clone(), res);
+pub fn verify_one(
+    public_key: console::ECDSAPublicKey,
+    signature: console::ECDSASignature,
+    msg: Vec<u8>,
+) {
+    // println!("size of public_key bytes:\t{}", public_key.bytes.len());
+    // println!("size of signature bytes:\t{}", signature.bytes.len());
+    // println!("size of msg bytes:\t{}", msg.bytes.len());
+
+    // Clean all circuits
+    Circuit::reset();
+    r1cs_provider::xjsnark::build_r1cs_for_verify_ecdsa(
+        &msg,
+        public_key.public_key.to_encoded_point(true).as_bytes(),
+        &signature.signature.to_bytes(),
+    )
+    .context("failed to build circuit")
+    .unwrap();
 }

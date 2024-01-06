@@ -55,12 +55,14 @@ pub fn run_circuit(
     // reset circuit writer
     Circuit::reset();
 
-    // sample msg and witness as public input
-    let msg = circuit::Message::new(Mode::Public, msg.clone());
+    /*
+       // sample msg and witness as public input
+       let msg = circuit::Message::new(Mode::Public, msg.clone());
 
-    // sample pubkey and sig and witness as public input
-    let public_key = circuit::ECDSAPublicKey::new(Mode::Public, public_key);
-    let signature = circuit::ECDSASignature::new(Mode::Public, signature);
+       // sample pubkey and sig and witness as public input
+       let public_key = circuit::ECDSAPublicKey::new(Mode::Public, public_key);
+       let signature = circuit::ECDSASignature::new(Mode::Public, signature);
+    */
 
     // run circuit
     circuit::verify_one(public_key, signature, msg);

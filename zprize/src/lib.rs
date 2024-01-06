@@ -22,6 +22,7 @@ use snarkvm_curves::bls12_377::Bls12_377;
 pub mod api;
 pub mod circuit;
 pub mod console;
+pub mod r1cs_provider;
 
 /// A (public key, msg, signature) tuple.
 pub type Tuples = Vec<(VerifyingKey, Vec<u8>, Signature)>;
@@ -49,6 +50,7 @@ mod tests {
         // with messages of length `msg_len`
         let num = 1;
         let msg_len = 50000;
+        // let msg_len = 100;
         let tuples = console::generate_signatures(msg_len, num);
 
         // setup

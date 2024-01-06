@@ -23,6 +23,7 @@ serde = "1.0"
 serde_json = "1.0"
 anyhow = "1.0.79"
 hex = "0.4.3"
+aleo-std-profiler = { version = "0.1.15", features = ["profiler"]} # enable "profiler" feature for this crate, which is depended by snarkVM
 
 [dev-dependencies]
 criterion = { version = "0.4", features = ["html_reports"] }

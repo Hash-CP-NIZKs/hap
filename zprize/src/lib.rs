@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use aleo_std_profiler::{end_timer, start_timer};
 use k256::ecdsa::{Signature, VerifyingKey};
 use snarkvm_algorithms::{
     polycommit::kzg10::UniversalParams,
@@ -34,10 +35,14 @@ pub fn prove_and_verify(
     tuples: &Tuples,
 ) {
     // TODO: test could be adjusted to pass references and clone less
+    let prove_time = start_timer!(|| format!("Generate proof for all {} tuples", tuples.len()));
     let proof = api::prove(urs, pk, tuples.clone());
+    end_timer!(prove_time);
 
     // Note: proof verification should take negligible time,
+    let verify_time = start_timer!(|| format!("Verify proof for all {} tuples", tuples.len()));
     api::verify_proof(urs, vk, tuples, &proof);
+    end_timer!(verify_time);
 }
 
 #[cfg(test)]

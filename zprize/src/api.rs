@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use aleo_std_profiler::{end_timer, start_timer};
 use rand::rngs::OsRng;
 use snarkvm_algorithms::{
     crypto_hash::PoseidonSponge,
@@ -166,5 +167,7 @@ pub fn verify_proof(
     let universal_verifier = urs.to_universal_verifier().unwrap();
 
     // Note: same comment here, verify_batch could verify several proofs instead of one ;)
+    let time = start_timer!(|| "Run VarunaInst::verify_batch()");
     VarunaInst::verify_batch(&universal_verifier, fiat_shamir, &keys_to_inputs, proof).unwrap();
+    end_timer!(time);
 }

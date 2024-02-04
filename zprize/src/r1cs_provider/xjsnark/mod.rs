@@ -44,9 +44,10 @@ pub fn build_r1cs_for_verify_ecdsa(
     }
 
     // 3. read r1cs and .in, then parse it to R1CS in snarkvm
-    super::builder::construct_r1cs_from_json(
-        tmp_dir.join("r1cs.json"),
-        tmp_dir.join("assignment.json"),
-        Option::<&str>::None,
-    )
+    // super::builder::construct_r1cs_from_file(
+    //     tmp_dir.join("r1cs.json"),
+    //     tmp_dir.join("assignment.json"),
+    //     Option::<&str>::None,
+    // )
+    todo!()
 }

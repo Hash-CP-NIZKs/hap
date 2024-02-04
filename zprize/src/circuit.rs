@@ -1,7 +1,8 @@
 use anyhow::Context;
+use snarkvm_algorithms::r1cs::LookupTable;
 use snarkvm_circuit::environment::Circuit;
 use snarkvm_circuit_environment::{prelude::PrimeField, Eject, Environment, Inject, Mode};
-use snarkvm_console_network::prelude::Itertools;
+use snarkvm_console_network::{prelude::Itertools, Testnet3};
 use snarkvm_utilities::biginteger::BigInteger;
 
 // TODO: better to use AleoV0 or Circuit?
@@ -211,11 +212,27 @@ pub fn verify_one(
 
     // Clean all circuits
     Circuit::reset();
-    r1cs_provider::xjsnark::build_r1cs_for_verify_ecdsa(
-        &msg,
-        public_key.public_key.to_encoded_point(true).as_bytes(),
-        &signature.signature.to_bytes(),
-    )
-    .context("failed to build circuit")
-    .unwrap();
+    // r1cs_provider::xjsnark::build_r1cs_for_verify_ecdsa(
+    //     &msg,
+    //     public_key.public_key.to_encoded_point(true).as_bytes(),
+    //     &signature.signature.to_bytes(),
+    // )
+    // .context("failed to build circuit")
+    // .unwrap();
+
+    r1cs_provider::gnark::build_r1cs_for_verify_plonky2()
+        .context("failed to build circuit")
+        .unwrap();
+
+    // let x = F::new(Mode::Public, snarkvm_console::types::Field::from_u8(3));
+    // let y = F::new(Mode::Public, snarkvm_console::types::Field::from_u8(12));
+    // let z = F::new(Mode::Public, snarkvm_console::types::Field::from_u8(15));
+
+    // Env::assert_eq(x.clone(), x.clone());
+
+    // type EF = <Testnet3 as snarkvm_console_network::Environment>::Field;
+    // let mut table = LookupTable::default();
+    // table.fill([EF::from(3u32), EF::from(12u32)], EF::from(15u32));
+    // Env::add_lookup_table(table);
+    // Env::enforce_lookup(|| (x, y, z, 0));
 }

@@ -25,6 +25,17 @@ anyhow = "1.0.79"
 hex = "0.4.3"
 aleo-std-profiler = { version = "0.1.15", features = ["profiler"]} # enable "profiler" feature for this crate, which is depended by snarkVM
 
+tempfile = "3.9.0"
+
+[patch."https://github.com/AleoHQ/snarkVM"]
+snarkvm-algorithms = { path = '../../snarkVM/algorithms' }
+snarkvm-circuit = { path = '../../snarkVM/circuit' }
+snarkvm-console = { path = '../../snarkVM/console' }
+snarkvm-curves = { path = '../../snarkVM/curves' }
+snarkvm-circuit-environment = { path = '../../snarkVM/circuit/environment' }
+snarkvm-console-network = { path = '../../snarkVM/console/network' }
+snarkvm-utilities = { path = '../../snarkVM/utilities' }
+
 [dev-dependencies]
 criterion = { version = "0.4", features = ["html_reports"] }
 

@@ -24,7 +24,6 @@ use snarkvm_circuit::{
     environment::{Assignment, Circuit},
     Environment as _,
 };
-use snarkvm_circuit_environment::{Inject, Mode};
 use snarkvm_console::network::Testnet3 as Network;
 use snarkvm_console_network::Network as _;
 use snarkvm_curves::bls12_377::{Bls12_377, Fq, Fr};
@@ -101,9 +100,17 @@ pub fn compile(
     let (public_key, signature) = console::sample_pubkey_sig(&msg);
     let circuit = run_circuit(public_key, signature, msg);
     println!("num constraints: {}", circuit.num_constraints());
+    println!("num lookup tables: {}", circuit.num_lookup_tables());
+    println!(
+        "num lookup constraints: {}",
+        circuit.num_lookup_constraints()
+    );
     println!("num public: {}", circuit.num_public());
     println!("num private: {}", circuit.num_private());
-    println!("num non-zeros: {:?}", circuit.num_nonzeros());
+    println!(
+        "num non-zeros(both non-lookup and lookup): {:?}",
+        circuit.num_nonzeros()
+    );
     VarunaInst::circuit_setup(&urs, &circuit).unwrap()
 }
 

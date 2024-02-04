@@ -6,24 +6,27 @@ use anyhow::{Context as _, Result};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct BigInt(pub [u64; 4]);
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct R1CS(pub Vec<Constraint>);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Constraint {
-    pub a: HashMap<usize, String>, /* bigint in 10-base digest */
-    pub b: HashMap<usize, String>,
-    pub c: HashMap<usize, String>,
+    pub a: HashMap<usize, BigInt>, /* bigint in 10-base digest */
+    pub b: HashMap<usize, BigInt>,
+    pub c: HashMap<usize, BigInt>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Assignment {
-    pub variables: Vec<String>,
+    pub variables: Vec<BigInt>,
     pub primary_input_size: usize, /* number of public */
     pub auxiliary_input_size: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct LookupTable(pub Vec<[String; 3]>);
+pub struct LookupTable(pub Vec<[u32; 3]>);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Lookup {
@@ -32,25 +35,25 @@ pub struct Lookup {
 }
 
 pub fn parse_file(
-    r1cs_json_file: impl AsRef<Path>,
-    assignment_json_file: impl AsRef<Path>,
-    lookup_json_file: Option<impl AsRef<Path>>,
+    r1cs_file: impl AsRef<Path>,
+    assignment_file: impl AsRef<Path>,
+    lookup_file: Option<impl AsRef<Path>>,
 ) -> Result<(R1CS, Assignment, Option<Lookup>)> {
-    let file = File::open(r1cs_json_file)?;
+    let file = File::open(r1cs_file)?;
     let reader = BufReader::new(file);
-    let r1cs: R1CS = serde_json::from_reader(reader).context("error while parsing r1cs json")?;
+    let r1cs: R1CS = serde_cbor::from_reader(reader).context("error while parsing r1cs file")?;
 
-    let file = File::open(assignment_json_file)?;
+    let file = File::open(assignment_file)?;
     let reader = BufReader::new(file);
     let assignment: Assignment =
-        serde_json::from_reader(reader).context("error while parsing assignment json")?;
+        serde_cbor::from_reader(reader).context("error while parsing assignment file")?;
 
-    let lookup = match lookup_json_file {
-        Some(lookup_json_file) => {
-            let file = File::open(lookup_json_file)?;
+    let lookup = match lookup_file {
+        Some(lookup_file) => {
+            let file = File::open(lookup_file)?;
             let reader = BufReader::new(file);
             let lookup: Lookup =
-                serde_json::from_reader(reader).context("error while parsing lookup json")?;
+                serde_cbor::from_reader(reader).context("error while parsing lookup file")?;
             Some(lookup)
         }
         _ => None,
@@ -66,20 +69,24 @@ mod tests {
 
     #[test]
     fn test_parse() -> Result<()> {
-        let file = File::open("/home/imlk/workspace/zprize/jsnark/libsnark/build/r1cs.json")?;
+        let file =
+            File::open("/home/imlk/workspace/zprize/gnark-plonky2-verifier/output/r1cs.cbor")?;
         let reader = BufReader::new(file);
-        let r1cs: R1CS = serde_json::from_reader(reader)?;
-        println!("{:#?}", r1cs);
+        let r1cs: R1CS = serde_cbor::from_reader(reader)?;
+        // println!("{:#?}", r1cs);
 
-        let file = File::open("/home/imlk/workspace/zprize/jsnark/libsnark/build/assignment.json")?;
+        let file = File::open(
+            "/home/imlk/workspace/zprize/gnark-plonky2-verifier/output/assignment.cbor",
+        )?;
         let reader = BufReader::new(file);
-        let assignment: Assignment = serde_json::from_reader(reader)?;
-        println!("{:#?}", assignment);
+        let assignment: Assignment = serde_cbor::from_reader(reader)?;
+        // println!("{:#?}", assignment);
 
-        let file = File::open("/home/imlk/workspace/zprize/gnark-plonky2-verifier/output/lookup.json")?;
+        let file =
+            File::open("/home/imlk/workspace/zprize/gnark-plonky2-verifier/output/lookup.cbor")?;
         let reader = BufReader::new(file);
-        let lookup: Lookup = serde_json::from_reader(reader)?;
-        println!("{:#?}", lookup);
+        let lookup: Lookup = serde_cbor::from_reader(reader)?;
+        // println!("{:#?}", lookup);
         Ok(())
     }
 }

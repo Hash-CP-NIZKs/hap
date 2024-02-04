@@ -1253,6 +1253,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_cbor"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bef2ebfde456fb76bbcf9f59315333decc4fda0b2b44b420243c11e0f5ec1f5"
+dependencies = [
+ "half",
+ "serde",
+]
+
+[[package]]
 name = "serde_derive"
 version = "1.0.194"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2190,7 +2200,7 @@ dependencies = [
  "k256",
  "rand",
  "serde",
- "serde_json",
+ "serde_cbor",
  "sha3",
  "snarkvm-algorithms",
  "snarkvm-circuit",

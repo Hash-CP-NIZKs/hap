@@ -1,29 +1,40 @@
 use std::collections::HashMap;
+use std::convert::From;
 use std::path::Path;
-use std::str::FromStr;
 
 use aleo_std_profiler::{end_timer, start_timer};
 use anyhow::Result;
 use snarkvm_algorithms::r1cs::LookupTable;
 use snarkvm_circuit::Circuit as Env;
 use snarkvm_circuit::Field;
+use snarkvm_circuit_environment::prelude::snarkvm_fields::Fp256;
+use snarkvm_circuit_environment::prelude::PrimeField;
 use snarkvm_circuit_environment::{Environment as _, Inject as _, LinearCombination, Mode};
 use snarkvm_console_network::{Environment, Testnet3};
+use snarkvm_curves::bls12_377::FrParameters;
+use snarkvm_utilities::BigInteger256;
 
 use super::deserialize;
+use super::deserialize::BigInt;
 
 type EF = <Testnet3 as Environment>::Field;
 type F = Field<Env>;
 
-pub(crate) fn construct_r1cs_from_json(
-    r1cs_json_file: impl AsRef<Path>,
-    assignment_json_file: impl AsRef<Path>,
-    lookup_json_file: Option<impl AsRef<Path>>,
-) -> Result<()> {
+impl From<&BigInt> for Fp256<FrParameters> {
+    fn from(value: &BigInt) -> Self {
+        // Self(BigInteger256(value.0), PhantomData)
+        Self::from_bigint(BigInteger256(value.0)).unwrap()
+    }
+}
 
+pub(crate) fn construct_r1cs_from_file(
+    r1cs_file: impl AsRef<Path>,
+    assignment_file: impl AsRef<Path>,
+    lookup_file: Option<impl AsRef<Path>>,
+) -> Result<()> {
     let parse_time = start_timer!(|| "deserialize::parse_file()");
     let (r1cs, assignment, lookup) =
-        deserialize::parse_file(r1cs_json_file, assignment_json_file, lookup_json_file)?;
+        deserialize::parse_file(r1cs_file, assignment_file, lookup_file)?;
     end_timer!(parse_time);
 
     let mut fields = assignment
@@ -32,19 +43,19 @@ pub(crate) fn construct_r1cs_from_json(
         .map(|variable| {
             Ok(F::new(
                 Mode::Public,
-                snarkvm_console::types::Field::new(EF::from_str(&variable)?),
+                snarkvm_console::types::Field::new(EF::from(variable)),
             ))
         })
         .collect::<Result<Vec<_>>>()?;
     // insert first element `1`
     fields.insert(0, F::from(Env::one()));
 
-    let func_convert_lc = |lc: &HashMap<usize, String>| -> Result<_> {
+    let func_convert_lc = |lc: &HashMap<usize, BigInt>| -> Result<_> {
         // create Field<Env> from libsnark's linear_combination
         let mut f: Field<Env> = F::from(Env::zero());
         for term in lc {
-            let coeff = EF::from_str(&term.1)?;
-            f += F::from(LinearCombination::from(fields[*term.0].clone()) * (coeff));
+            let coeff = EF::from(term.1);
+            f += &F::from(LinearCombination::from(&fields[*term.0]) * (&coeff));
         }
         Ok(f)
     };
@@ -61,10 +72,7 @@ pub(crate) fn construct_r1cs_from_json(
     if let Some(lookup) = lookup {
         let mut table = LookupTable::default();
         lookup.table.0.iter().try_for_each(|item| -> Result<_> {
-            table.fill(
-                [EF::from_str(&item[0])?, EF::from_str(&item[1])?],
-                EF::from_str(&item[2])?,
-            );
+            table.fill([EF::from(item[0]), EF::from(item[1])], EF::from(item[2]));
             Ok(())
         })?;
         Env::add_lookup_table(table);

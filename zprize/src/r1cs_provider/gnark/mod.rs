@@ -13,9 +13,9 @@ pub fn build_r1cs_for_verify_plonky2() -> Result<()> {
 
     let construct_time = start_timer!(|| "builder::construct_r1cs_from_file()");
     let ret = super::builder::construct_r1cs_from_file(
-        "/home/imlk/workspace/zprize/gnark-ecdsa-test/output/r1cs.cbor",
-        "/home/imlk/workspace/zprize/gnark-ecdsa-test/output/assignment.cbor",
-        Some("/home/imlk/workspace/zprize/gnark-ecdsa-test/output/lookup.cbor"),
+        "../gnark-ecdsa-test/output/r1cs.cbor",
+        "../gnark-ecdsa-test/output/assignment.cbor",
+        Some("../gnark-ecdsa-test/output/lookup.cbor"),
     );
     end_timer!(construct_time);
     ret

@@ -13,7 +13,7 @@ snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM", branch = "zprize_2
 snarkvm-circuit-environment = { git = "https://github.com/AleoHQ/snarkVM", branch = "zprize_2023" }
 snarkvm-console-network = { git = "https://github.com/AleoHQ/snarkVM", branch = "zprize_2023" }
 snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM", branch = "zprize_2023" }
-
+plonky2_evm = { path = "../evm/evm" }
 rand = "0.8.5"
 k256 = { version = "0.13", features = ["ecdsa"] }
 ecdsa = { version = "0.16", features = ["signing", "verifying"] }
@@ -28,13 +28,13 @@ aleo-std-profiler = { version = "0.1.15", features = ["profiler"]} # enable "pro
 tempfile = "3.9.0"
 
 [patch."https://github.com/AleoHQ/snarkVM"]
-snarkvm-algorithms = { path = '../../snarkVM/algorithms' }
-snarkvm-circuit = { path = '../../snarkVM/circuit' }
-snarkvm-console = { path = '../../snarkVM/console' }
-snarkvm-curves = { path = '../../snarkVM/curves' }
-snarkvm-circuit-environment = { path = '../../snarkVM/circuit/environment' }
-snarkvm-console-network = { path = '../../snarkVM/console/network' }
-snarkvm-utilities = { path = '../../snarkVM/utilities' }
+snarkvm-algorithms = { path = '../snarkVM/algorithms' }
+snarkvm-circuit = { path = '../snarkVM/circuit' }
+snarkvm-console = { path = '../snarkVM/console' }
+snarkvm-curves = { path = '../snarkVM/curves' }
+snarkvm-circuit-environment = { path = '../snarkVM/circuit/environment' }
+snarkvm-console-network = { path = '../snarkVM/console/network' }
+snarkvm-utilities = { path = '../snarkVM/utilities' }
 
 [dev-dependencies]
 criterion = { version = "0.4", features = ["html_reports"] }

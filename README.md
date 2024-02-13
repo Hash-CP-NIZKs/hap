@@ -89,3 +89,15 @@ All submission code must be open-sourced at the time of submission. Code and doc
 
 If there are any questions about this prize, please contact [david@zksecurity.xyz](mailto:david@zksecurity.xyz&subject=zprize) or ask your question on [Discord](https://discord.com/channels/954403678079578173/1131190201205665862).
 
+# Notes
+ rustup  default nightly
+```
+ sudo apt install libssl-dev  1455  pkg-config
+```
+
+
+# notes
+go env -w GO111MODULE=on
+go env -w GOPROXY=https://goproxy.cn,direct
+go mod tidy
+go run ./main.go 

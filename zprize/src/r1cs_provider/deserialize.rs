@@ -70,20 +70,20 @@ mod tests {
     #[test]
     fn test_parse() -> Result<()> {
         let file =
-            File::open("/home/imlk/workspace/zprize/gnark-plonky2-verifier/output/r1cs.cbor")?;
+            File::open("../gnark-plonky2-verifier/output/r1cs.cbor")?;
         let reader = BufReader::new(file);
         let r1cs: R1CS = serde_cbor::from_reader(reader)?;
         // println!("{:#?}", r1cs);
 
         let file = File::open(
-            "/home/imlk/workspace/zprize/gnark-plonky2-verifier/output/assignment.cbor",
+            "../gnark-plonky2-verifier/output/assignment.cbor",
         )?;
         let reader = BufReader::new(file);
         let assignment: Assignment = serde_cbor::from_reader(reader)?;
         // println!("{:#?}", assignment);
 
         let file =
-            File::open("/home/imlk/workspace/zprize/gnark-plonky2-verifier/output/lookup.cbor")?;
+            File::open("../gnark-plonky2-verifier/output/lookup.cbor")?;
         let reader = BufReader::new(file);
         let lookup: Lookup = serde_cbor::from_reader(reader)?;
         // println!("{:#?}", lookup);

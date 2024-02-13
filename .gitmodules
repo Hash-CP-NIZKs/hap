@@ -1,0 +1,15 @@
+[submodule "snarkVM"]
+	path = snarkVM
+	url = git@github.com:zproof/snarkVM.git
+[submodule "gnark-ecdsa-test"]
+	path = gnark-ecdsa-test
+	url = git@github.com:zproof/gnark-ecdsa-test.git
+[submodule "gnark"]
+	path = gnark
+	url = git@github.com:zproof/gnark.git
+[submodule "gnark-plonky2-verifier"]
+	path = gnark-plonky2-verifier
+	url = git@github.com:zproof/gnark-plonky2-verifier.git
+[submodule "evm"]
+	path = evm
+	url = git@github.com:zproof/evm.git

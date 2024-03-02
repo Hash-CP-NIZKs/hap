@@ -13,3 +13,6 @@
 [submodule "evm"]
 	path = evm
 	url = git@github.com:zproof/evm.git
+[submodule "plonky2-ecdsa"]
+	path = plonky2-ecdsa
+	url = git@github.com:zproof/plonky2-ecdsa.git

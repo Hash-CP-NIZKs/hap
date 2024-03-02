@@ -20,3 +20,13 @@ pub fn build_r1cs_for_verify_plonky2() -> Result<()> {
     end_timer!(construct_time);
     ret
 }
+// input: 50 * data
+
+// (1) keccak <- input * 50 -> 1 proof , 50 * hash  | 1 * proof with ProofWithPublicInputs<GoldilocksField, PoseidonGoldilocksConfig, 2>, VerifierOnlyCircuitData<PoseidonGoldilocksConfig, 2>, CommonCircuitData<GoldilocksField, 2>
+// gnark-verifier <- 3*json
+//  ->  r1cs(3*json) -> veruna
+// ------
+// gnark-ecdsa <- 
+
+
+// output: proof

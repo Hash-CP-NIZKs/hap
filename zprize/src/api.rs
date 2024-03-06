@@ -132,7 +132,7 @@ pub fn prove(
         let assignment = run_circuit(public_key, signature, msg);
         assignments.push(assignment);
     }
-
+    // 
     instances.insert(pk, &assignments[..]);
 
     // Compute the proof.

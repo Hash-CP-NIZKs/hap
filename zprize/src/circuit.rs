@@ -218,9 +218,10 @@ pub fn verify_one(
     //     &signature.signature.to_bytes(),
     // )
     // .context("failed to build circuit")
-    // .unwrap();
-
-    r1cs_provider::gnark::build_r1cs_for_verify_plonky2()
+    // .unwrap()
+   
+    
+    r1cs_provider::gnark::build_r1cs_for_verify_plonky2(public_key,signature,vec![msg])
         .context("failed to build circuit")
         .unwrap();
 

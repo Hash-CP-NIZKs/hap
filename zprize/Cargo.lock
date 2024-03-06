@@ -1407,8 +1407,7 @@ checksum = "26072860ba924cbfa98ea39c8c19b4dd6a4a25423dbdf219c1eca91aa0cf6964"
 [[package]]
 name = "plonky2"
 version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d39903618cc65680847b1b6b4cf3a784069dc83f15825006252fc0855d88b44c"
+source = "git+ssh://git@github.com/zproof/evm.git?branch=v012#429d28d1e19274494ca174596384f30ddd6333ef"
 dependencies = [
  "ahash 0.7.8",
  "anyhow",
@@ -1485,6 +1484,7 @@ dependencies = [
  "once_cell",
  "pest",
  "pest_derive",
+ "plonky2 0.1.2",
  "plonky2 0.1.4",
  "plonky2_ecdsa",
  "plonky2_maybe_rayon 0.1.1",
@@ -2947,10 +2947,13 @@ dependencies = [
  "ecdsa",
  "hex",
  "k256",
+ "plonky2 0.1.2",
+ "plonky2_ecdsa",
  "plonky2_evm",
  "rand",
  "serde",
  "serde_cbor",
+ "serde_json",
  "sha3",
  "snarkvm-algorithms",
  "snarkvm-circuit",

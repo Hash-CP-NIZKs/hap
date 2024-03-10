@@ -62,25 +62,25 @@ pub fn build_r1cs_for_verify_plonky2(
     let (tuple, _) = plonky2_evm::hash2::prove_and_aggregate(pk, sig, vec![hash_input]).unwrap();
 
     let common_data_file =
-        File::create("../gnark-plonky2-verifier/testdata/zprice/common_circuit_data.json").unwrap();
+        File::create("../gnark-plonky2-verifier/testdata/zprize/common_circuit_data.json").unwrap();
     serde_json::to_writer(&common_data_file, &tuple.2).unwrap();
     println!("Succesfully wrote common circuit data to common_circuit_data.json");
 
     let verifier_data_file =
-        File::create("../gnark-plonky2-verifier/testdata/zprice/verifier_only_circuit_data.json")
+        File::create("../gnark-plonky2-verifier/testdata/zprize/verifier_only_circuit_data.json")
             .unwrap();
     serde_json::to_writer(&verifier_data_file, &tuple.1).unwrap();
     println!("Succesfully wrote verifier data to verifier_only_circuit_data.json");
 
     let proof_file =
-        File::create("../gnark-plonky2-verifier/testdata/zprice/proof_with_public_inputs.json")
+        File::create("../gnark-plonky2-verifier/testdata/zprize/proof_with_public_inputs.json")
             .unwrap();
     serde_json::to_writer(&proof_file, &tuple.0).unwrap();
     println!("Succesfully wrote proof to proof_with_public_inputs.json");
 
     std::process::Command::new("../gnark-plonky2-verifier/benchmark")
         .args(&["-proof-system", "groth16", "-plonky2-circuit", "zprize"])
-        .current_dir("../gnark-plonky2-verifier")
+        .current_dir("/home/lantu/ysw/zprize-ecdsa-varuna/gnark-plonky2-verifier")
         .status()
         .unwrap();
     // go run benchmark.go -proof-system groth16 -plonky2-circuit zprize

@@ -69,8 +69,6 @@ checksum = "7527351aa675fdbe6a1902de3cf913ff7d50ccd6822f1562be374bdd85eaefb8"
 [[package]]
 name = "aleo-std-profiler"
 version = "0.1.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bf055ddb2f54fa86394d19d87e7956df2f3cafff489fc14c0f48f2f80664c3d"
 dependencies = [
  "colored",
 ]

@@ -41,6 +41,7 @@ snarkvm-utilities = { path = '../snarkVM/utilities' }
 
 [patch.crates-io]
 plonky2 = { git = "ssh://git@github.com/zproof/evm.git", branch = "v012" }
+aleo-std-profiler = { path = '../aleo-std/profiler' }
 
 [dev-dependencies]
 criterion = { version = "0.4", features = ["html_reports"] }

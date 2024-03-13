@@ -18,4 +18,4 @@
 	url = git@github.com:zproof/plonky2-ecdsa.git
 [submodule "aleo-std"]
 	path = aleo-std
-	url = https://github.com/AleoHQ/aleo-std.git
+	url = git@github.com:zproof/aleo-std.git

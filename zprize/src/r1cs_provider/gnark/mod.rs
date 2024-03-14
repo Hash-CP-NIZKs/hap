@@ -106,7 +106,7 @@ pub fn build_r1cs_for_verify_plonky2(
     println!("serde to json{:?}", elapsed_time);
     std::process::Command::new("../gnark-plonky2-verifier/benchmark")
         .args(&["-proof-system", "groth16", "-plonky2-circuit", "zprize"])
-        .current_dir("/home/imlk/workspace/zprize/zprize-ecdsa-varuna/gnark-plonky2-verifier")
+        .current_dir("../gnark-plonky2-verifier")
         .status()
         .unwrap();
     // go run benchmark.go -proof-system groth16 -plonky2-circuit zprize

@@ -31,17 +31,17 @@ fn criterion_benchmark(c: &mut Criterion) {
     // 100 bytes
     let msg_len = 100;
     let small_tuples = zprize::console::generate_signatures(msg_len, num);
-    let small_circuit_keys = zprize::api::compile(&urs, msg_len);
+    let small_circuit_keys = zprize::api::compile(&urs, msg_len, 0);
 
     // 1,000 bytes
     let msg_len = 1000;
     let medium_tuples = zprize::console::generate_signatures(msg_len, num);
-    let medium_circuit_keys = zprize::api::compile(&urs, msg_len);
+    let medium_circuit_keys = zprize::api::compile(&urs, msg_len, 0);
 
     // 50,000 bytes
     let msg_len = 50000;
     let large_tuples = zprize::console::generate_signatures(msg_len, num);
-    let large_circuit_keys = zprize::api::compile(&urs, msg_len);
+    let large_circuit_keys = zprize::api::compile(&urs, msg_len, 0);
 
     //
     // WARNING

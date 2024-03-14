@@ -15,6 +15,7 @@
 use aleo_std_profiler::{end_timer, start_timer};
 use anyhow::Context;
 use rand::rngs::OsRng;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sha3::{Digest, Keccak256};
 use snarkvm_algorithms::{
     crypto_hash::PoseidonSponge,
@@ -210,22 +211,25 @@ pub fn prove(
         } else {
             pks[0]
         };
-        ecdsa_assignments = Vec::with_capacity(tuples.len());
-        for tuple in tuples {
-            // Note: we use a naive encoding here,
-            // you can modify it as long as a verifier can still pass tuples `(public key, msg, signature)`.
-            let (public_key, msg, signature) = tuple;
-            let assignment = run_circuit_ecdsa(
-                &console::ECDSAPublicKey {
-                    public_key: public_key.clone(),
-                },
-                &console::ECDSASignature {
-                    signature: signature.clone(),
-                },
-                msg,
-            );
-            ecdsa_assignments.push(assignment);
-        }
+        ecdsa_assignments = tuples
+            .into_par_iter()
+            .map(|tuple| {
+                // Note: we use a naive encoding here,
+                // you can modify it as long as a verifier can still pass tuples `(public key, msg, signature)`.
+                let (public_key, msg, signature) = tuple;
+                let assignment = run_circuit_ecdsa(
+                    &console::ECDSAPublicKey {
+                        public_key: public_key.clone(),
+                    },
+                    &console::ECDSASignature {
+                        signature: signature.clone(),
+                    },
+                    msg,
+                );
+                assignment
+            })
+            .collect::<Vec<_>>();
+
         pks_to_constraints.insert(ecdsa_pk, &ecdsa_assignments[..]);
     }
 

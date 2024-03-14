@@ -5,7 +5,10 @@ use anyhow::Result;
 use k256::elliptic_curve::sec1;
 use num_bigint::BigInt;
 use num_bigint::Sign;
+use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
 use scopeguard::defer;
+use serde::Serialize;
 use snarkvm_utilities::Write;
 use std::env;
 use std::fs::File;
@@ -73,35 +76,29 @@ pub fn build_r1cs_for_verify_plonky2(
     // plonky2 kecaak && ecdsa -> json -> garnk-plonky2 -> cbor
     // TODO: call ganrk-plonky2-verifier and gnark-ecdsa-test to generate R1CS
     let (tuple, _) = plonky2_evm::hash2::prove_and_aggregate(msgs).unwrap();
+    vec![
+        (
+            "../gnark-plonky2-verifier/testdata/zprize/common_circuit_data.json",
+            Box::new(move || serde_json::to_vec(&tuple.2).unwrap()) as Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'static>,
+        ),
+        (
+            "../gnark-plonky2-verifier/testdata/zprize/verifier_only_circuit_data.json",
+            Box::new(move || serde_json::to_vec(&tuple.1).unwrap()),
+        ),
+        (
+            "../gnark-plonky2-verifier/testdata/zprize/proof_with_public_inputs.json",
+            Box::new(move || serde_json::to_vec(&tuple.0).unwrap()),
+        ),
+    ]
+    .into_par_iter()
+    .map(|(fp, ser)| {
+        let mut file = File::create(fp).unwrap();
+        let data = ser();
+        file.write_all(&data).unwrap();
+        println!("Succesfully wrote {} size{:?}", fp, data.len());
+    })
+    .collect::<Vec<_>>();
 
-    let mut common_data_file =
-        File::create("../gnark-plonky2-verifier/testdata/zprize/common_circuit_data.json").unwrap();
-    let data = serde_json::to_vec(&tuple.2).unwrap();
-    common_data_file.write_all(&data).unwrap();
-    println!(
-        "Succesfully wrote common circuit data to common_circuit_data.json size{:?}",
-        data.len()
-    );
-
-    let mut verifier_data_file =
-        File::create("../gnark-plonky2-verifier/testdata/zprize/verifier_only_circuit_data.json")
-            .unwrap();
-    let data = serde_json::to_vec(&tuple.1).unwrap();
-    verifier_data_file.write_all(&data).unwrap();
-    println!(
-        "Succesfully wrote verifier data to verifier_only_circuit_data.json  size{:?}",
-        data.len()
-    );
-
-    let mut proof_file =
-        File::create("../gnark-plonky2-verifier/testdata/zprize/proof_with_public_inputs.json")
-            .unwrap();
-    let data = serde_json::to_vec(&tuple.0).unwrap();
-    proof_file.write_all(&data).unwrap();
-    println!(
-        "Succesfully wrote proof to proof_with_public_inputs.json  size{:?}",
-        data.len()
-    );
     let elapsed_time = start_time.elapsed();
     println!("serde to json{:?}", elapsed_time);
     std::process::Command::new("../gnark-plonky2-verifier/benchmark")

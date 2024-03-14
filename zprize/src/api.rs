@@ -13,7 +13,9 @@
 // limitations under the License.
 
 use aleo_std_profiler::{end_timer, start_timer};
+use anyhow::Context;
 use rand::rngs::OsRng;
+use sha3::{Digest, Keccak256};
 use snarkvm_algorithms::{
     crypto_hash::PoseidonSponge,
     polycommit::kzg10::UniversalParams,
@@ -24,13 +26,13 @@ use snarkvm_circuit::{
     environment::{Assignment, Circuit},
     Environment as _,
 };
-use snarkvm_console::network::Testnet3 as Network;
+use snarkvm_console::{network::Testnet3 as Network, program::Itertools};
 use snarkvm_console_network::Network as _;
 use snarkvm_curves::bls12_377::{Bls12_377, Fq, Fr};
 use std::collections::BTreeMap;
 
-use crate::circuit;
 use crate::console;
+use crate::r1cs_provider;
 use crate::Tuples;
 
 //
@@ -46,26 +48,47 @@ type VarunaInst = varuna::VarunaSNARK<Bls12_377, FS, VarunaHidingMode>;
 // =========
 //
 
-/// Our circuit synthesizer.
-pub fn run_circuit(
-    public_key: console::ECDSAPublicKey,
-    signature: console::ECDSASignature,
-    msg: Vec<u8>,
+pub fn run_circuit_keccak(
+    public_key: &console::ECDSAPublicKey, // TODO: remove this
+    signature: &console::ECDSASignature,
+    msg: &[u8],
 ) -> Assignment<Fr> {
     // reset circuit writer
     Circuit::reset();
 
-    /*
-       // sample msg and witness as public input
-       let msg = circuit::Message::new(Mode::Public, msg.clone());
+    r1cs_provider::gnark::build_r1cs_for_verify_plonky2(
+        public_key,
+        signature,
+        vec![msg.into()], // TODO: optimize this alloc
+    )
+    .context("failed to build keccak circuit")
+    .unwrap();
 
-       // sample pubkey and sig and witness as public input
-       let public_key = circuit::ECDSAPublicKey::new(Mode::Public, public_key);
-       let signature = circuit::ECDSASignature::new(Mode::Public, signature);
-    */
+    // return circuit
+    Circuit::eject_assignment_and_reset()
+}
 
-    // run circuit
-    circuit::verify_one(public_key, signature, msg);
+/// Our circuit synthesizer for ecdsa.
+///
+pub fn run_circuit_ecdsa(
+    public_key: &console::ECDSAPublicKey,
+    signature: &console::ECDSASignature,
+    msg: &[u8],
+) -> Assignment<Fr> {
+    // reset circuit writer
+    Circuit::reset();
+
+    let mut hasher = Keccak256::new();
+    hasher.update(&msg);
+    let hash = hasher
+        .finalize()
+        .as_slice()
+        .try_into()
+        .expect("Wrong length");
+
+    r1cs_provider::gnark::build_r1cs_for_verify_ecdsa(public_key, signature, &hash)
+        .context("failed to build ecdsa circuit")
+        .unwrap();
 
     // return circuit
     Circuit::eject_assignment_and_reset()
@@ -92,89 +115,213 @@ pub fn setup(
 pub fn compile(
     urs: &UniversalParams<Bls12_377>,
     msg_len: usize,
-) -> (
+) -> Vec<(
     CircuitProvingKey<Bls12_377, VarunaHidingMode>,
     CircuitVerifyingKey<Bls12_377>,
-) {
+)> {
     let msg = console::sample_msg(msg_len);
     let (public_key, signature) = console::sample_pubkey_sig(&msg);
-    let circuit = run_circuit(public_key, signature, msg);
-    println!("num constraints: {}", circuit.num_constraints());
-    println!("num lookup tables: {}", circuit.num_lookup_tables());
-    println!(
-        "num lookup constraints: {}",
-        circuit.num_lookup_constraints()
-    );
-    println!("num public: {}", circuit.num_public());
-    println!("num private: {}", circuit.num_private());
-    println!(
-        "num non-zeros(both non-lookup and lookup): {:?}",
-        circuit.num_nonzeros()
-    );
-    VarunaInst::circuit_setup(&urs, &circuit).unwrap()
+
+    let mut unique_circuits = vec![];
+
+    if crate::ENABLE_CIRCUIT_FOR_KECCAK {
+        // Let's get a keccak circuit
+        let keccak_circuit = run_circuit_keccak(&public_key, &signature, &msg);
+        println!(
+            "keccak_circuit: num constraints: {}",
+            keccak_circuit.num_constraints()
+        );
+        println!(
+            "keccak_circuit: num lookup tables: {}",
+            keccak_circuit.num_lookup_tables()
+        );
+        println!(
+            "keccak_circuit: num lookup constraints: {}",
+            keccak_circuit.num_lookup_constraints()
+        );
+        println!(
+            "keccak_circuit: num public: {}",
+            keccak_circuit.num_public()
+        );
+        println!(
+            "keccak_circuit: num private: {}",
+            keccak_circuit.num_private()
+        );
+        println!(
+            "keccak_circuit: num non-zeros(both non-lookup and lookup): {:?}",
+            keccak_circuit.num_nonzeros()
+        );
+        unique_circuits.push(keccak_circuit);
+    }
+
+    if crate::ENABLE_CIRCUIT_FOR_ECDSA {
+        // Let's get a ecdsa circuit
+        let ecdsa_circuit = run_circuit_ecdsa(&public_key, &signature, &msg);
+        println!(
+            "ecdsa_circuit: num constraints: {}",
+            ecdsa_circuit.num_constraints()
+        );
+        println!(
+            "ecdsa_circuit: num lookup tables: {}",
+            ecdsa_circuit.num_lookup_tables()
+        );
+        println!(
+            "ecdsa_circuit: num lookup constraints: {}",
+            ecdsa_circuit.num_lookup_constraints()
+        );
+        println!("ecdsa_circuit: num public: {}", ecdsa_circuit.num_public());
+        println!(
+            "ecdsa_circuit: num private: {}",
+            ecdsa_circuit.num_private()
+        );
+        println!(
+            "ecdsa_circuit: num non-zeros(both non-lookup and lookup): {:?}",
+            ecdsa_circuit.num_nonzeros()
+        );
+        unique_circuits.push(ecdsa_circuit);
+    }
+
+    let unique_circuits = unique_circuits.iter().map(|c| c).collect_vec();
+    VarunaInst::batch_circuit_setup(&urs, &unique_circuits).unwrap()
 }
 
 /// Run and prove the circuit.
 pub fn prove(
     urs: &UniversalParams<Bls12_377>,
-    pk: &CircuitProvingKey<Bls12_377, VarunaHidingMode>,
+    pks: &[&CircuitProvingKey<Bls12_377, VarunaHidingMode>],
     tuples: Tuples,
 ) -> varuna::Proof<Bls12_377> {
-    // Prepare the instances.
-    let mut instances = BTreeMap::new();
-    let mut assignments = Vec::with_capacity(tuples.len());
-    for tuple in tuples {
-        // Note: we use a naive encoding here,
-        // you can modify it as long as a verifier can still pass tuples `(public key, msg, signature)`.
-        let (public_key, msg, signature) = tuple;
-        let public_key = console::ECDSAPublicKey { public_key };
-        let signature = console::ECDSASignature { signature };
-        let assignment = run_circuit(public_key, signature, msg);
-        assignments.push(assignment);
+    let mut pks_to_constraints = BTreeMap::new();
+
+    let keccak_assignments;
+    if crate::ENABLE_CIRCUIT_FOR_KECCAK {
+        let keccak_pk = pks[0];
+        let keccak_assignment = run_circuit_keccak(
+            // TODO: collect all msg and pass to run_circuit_keccak
+            &console::ECDSAPublicKey {
+                public_key: tuples[0].0,
+            },
+            &console::ECDSASignature {
+                signature: tuples[0].2,
+            },
+            &tuples[0].1,
+        );
+        keccak_assignments = [keccak_assignment];
+        pks_to_constraints.insert(keccak_pk, &keccak_assignments[..]);
     }
-    // 
-    instances.insert(pk, &assignments[..]);
+
+    let mut ecdsa_assignments;
+    if crate::ENABLE_CIRCUIT_FOR_ECDSA {
+        let ecdsa_pk = if crate::ENABLE_CIRCUIT_FOR_KECCAK {
+            pks[1]
+        } else {
+            pks[0]
+        };
+        ecdsa_assignments = Vec::with_capacity(tuples.len());
+        for tuple in tuples {
+            // Note: we use a naive encoding here,
+            // you can modify it as long as a verifier can still pass tuples `(public key, msg, signature)`.
+            let (public_key, msg, signature) = tuple;
+            let assignment = run_circuit_ecdsa(
+                &console::ECDSAPublicKey {
+                    public_key: public_key.clone(),
+                },
+                &console::ECDSASignature {
+                    signature: signature.clone(),
+                },
+                msg,
+            );
+            ecdsa_assignments.push(assignment);
+        }
+        pks_to_constraints.insert(ecdsa_pk, &ecdsa_assignments[..]);
+    }
 
     // Compute the proof.
     let rng = &mut OsRng::default();
     let universal_prover = urs.to_universal_prover().unwrap();
     let fiat_shamir = Network::varuna_fs_parameters();
-    let proof = VarunaInst::prove_batch(&universal_prover, fiat_shamir, &instances, rng).unwrap();
+    let proof =
+        VarunaInst::prove_batch(&universal_prover, fiat_shamir, &pks_to_constraints, rng).unwrap();
     proof
 }
 
 /// Verify a proof.
 pub fn verify_proof(
     urs: &UniversalParams<Bls12_377>,
-    vk: &CircuitVerifyingKey<Bls12_377>,
-    tuples: &Tuples,
+    vks: &[&CircuitVerifyingKey<Bls12_377>],
+    tuples: Tuples,
     proof: &varuna::Proof<Bls12_377>,
 ) {
     // Note: this is a hacky way of formatting public inputs,
     // we shouldn't have to run the circuit to do that.
-    let mut inputs = Vec::with_capacity(tuples.len());
-    for tuple in tuples {
-        let (public_key, msg, signature) = tuple.clone();
-        let public_key = console::ECDSAPublicKey { public_key };
-        let signature = console::ECDSASignature { signature };
-        let assignment = run_circuit(public_key, signature, msg);
 
-        // prepare input
-        let mut inputs_i = vec![];
-        for (_, input) in assignment.public_inputs() {
-            inputs_i.push(*input);
+    let mut vks_to_inputs = BTreeMap::new();
+
+    let keccak_inputs;
+    if crate::ENABLE_CIRCUIT_FOR_KECCAK {
+        let keccak_vk = vks[0];
+        let keccak_assignment = run_circuit_keccak(
+            // TODO: collect all msg and pass to run_circuit_keccak
+            &console::ECDSAPublicKey {
+                public_key: tuples[0].0,
+            },
+            &console::ECDSASignature {
+                signature: tuples[0].2,
+            },
+            &tuples[0].1,
+        );
+        let keccak_input = keccak_assignment
+            .public_inputs()
+            .iter()
+            .map(|(_, input)| *input)
+            .collect_vec();
+        keccak_inputs = [keccak_input];
+        vks_to_inputs.insert(keccak_vk, &keccak_inputs[..]);
+    }
+
+    // let mut inputs_i = vec![];
+    // for (_, input) in keccak_assignment.public_inputs() {
+    //     inputs_i.push(*input);
+    // }
+
+    let mut ecdsa_inputs;
+    if crate::ENABLE_CIRCUIT_FOR_ECDSA {
+        let ecdsa_vk = if crate::ENABLE_CIRCUIT_FOR_KECCAK {
+            vks[1]
+        } else {
+            vks[0]
+        };
+        ecdsa_inputs = Vec::with_capacity(tuples.len());
+        for tuple in tuples {
+            // Note: we use a naive encoding here,
+            // you can modify it as long as a verifier can still pass tuples `(public key, msg, signature)`.
+            let (public_key, msg, signature) = tuple;
+            let ecdsa_assignment = run_circuit_ecdsa(
+                &console::ECDSAPublicKey {
+                    public_key: public_key.clone(),
+                },
+                &console::ECDSASignature {
+                    signature: signature.clone(),
+                },
+                msg,
+            );
+            ecdsa_inputs.push(
+                ecdsa_assignment
+                    .public_inputs()
+                    .iter()
+                    .map(|(_, input)| *input)
+                    .collect_vec(),
+            );
         }
-        inputs.push(inputs_i);
+        vks_to_inputs.insert(ecdsa_vk, &ecdsa_inputs[..]);
     }
 
     // verify
-    let mut keys_to_inputs = BTreeMap::new();
-    keys_to_inputs.insert(vk, &inputs[..]);
     let fiat_shamir = Network::varuna_fs_parameters();
     let universal_verifier = urs.to_universal_verifier().unwrap();
 
     // Note: same comment here, verify_batch could verify several proofs instead of one ;)
     let time = start_timer!(|| "Run VarunaInst::verify_batch()");
-    VarunaInst::verify_batch(&universal_verifier, fiat_shamir, &keys_to_inputs, proof).unwrap();
+    VarunaInst::verify_batch(&universal_verifier, fiat_shamir, &vks_to_inputs, proof).unwrap();
     end_timer!(time);
 }

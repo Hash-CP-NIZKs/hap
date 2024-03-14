@@ -30,17 +30,17 @@ fn criterion_benchmark(c: &mut Criterion) {
     // 100 bytes
     let msg_len = 100;
     let small_tuples = zprize::console::generate_signatures(msg_len, num);
-    let (small_pk, small_vk) = zprize::api::compile(&urs, msg_len);
+    let small_circuit_keys = zprize::api::compile(&urs, msg_len);
 
     // 1,000 bytes
     let msg_len = 1000;
     let medium_tuples = zprize::console::generate_signatures(msg_len, num);
-    let (medium_pk, medium_vk) = zprize::api::compile(&urs, msg_len);
+    let medium_circuit_keys = zprize::api::compile(&urs, msg_len);
 
     // 50,000 bytes
     let msg_len = 50000;
     let large_tuples = zprize::console::generate_signatures(msg_len, num);
-    let (large_pk, large_vk) = zprize::api::compile(&urs, msg_len);
+    let large_circuit_keys = zprize::api::compile(&urs, msg_len);
 
     //
     // WARNING
@@ -54,21 +54,21 @@ fn criterion_benchmark(c: &mut Criterion) {
     group.bench_function("small message", |b| {
         b.iter(|| {
             // prove all tuples
-            zprize::prove_and_verify(&urs, &small_pk, &small_vk, black_box(&small_tuples));
+            zprize::prove_and_verify(&urs, &small_circuit_keys, black_box(&small_tuples));
         })
     });
 
     group.bench_function("medium message", |b| {
         b.iter(|| {
             // prove all tuples
-            zprize::prove_and_verify(&urs, &medium_pk, &medium_vk, black_box(&medium_tuples));
+            zprize::prove_and_verify(&urs, &medium_circuit_keys, black_box(&medium_tuples));
         })
     });
 
     group.bench_function("large message", |b| {
         b.iter(|| {
             // prove all tuples
-            zprize::prove_and_verify(&urs, &large_pk, &large_vk, black_box(&large_tuples));
+            zprize::prove_and_verify(&urs, &large_circuit_keys, black_box(&large_tuples));
         })
     });
 }

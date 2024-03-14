@@ -18,6 +18,7 @@ use snarkvm_algorithms::{
     polycommit::kzg10::UniversalParams,
     snark::varuna::{CircuitProvingKey, CircuitVerifyingKey, VarunaHidingMode},
 };
+use snarkvm_console::program::Itertools;
 use snarkvm_curves::bls12_377::Bls12_377;
 
 pub mod api;
@@ -25,23 +26,31 @@ pub mod circuit;
 pub mod console;
 pub mod r1cs_provider;
 
+// Config code here for testing KECCAK or ECDSA only
+pub const ENABLE_CIRCUIT_FOR_KECCAK: bool = true;
+pub const ENABLE_CIRCUIT_FOR_ECDSA: bool = true;
+
 /// A (public key, msg, signature) tuple.
-pub type Tuples = Vec<(VerifyingKey, Vec<u8>, Signature)>;
+pub type Tuples<'a> = &'a [(VerifyingKey, Vec<u8>, Signature)];
 
 pub fn prove_and_verify(
     urs: &UniversalParams<Bls12_377>,
-    pk: &CircuitProvingKey<Bls12_377, VarunaHidingMode>,
-    vk: &CircuitVerifyingKey<Bls12_377>,
-    tuples: &Tuples,
+    circuit_keys: &[(
+        CircuitProvingKey<Bls12_377, VarunaHidingMode>,
+        CircuitVerifyingKey<Bls12_377>,
+    )],
+    tuples: Tuples,
 ) {
     // TODO: test could be adjusted to pass references and clone less
+    let pks = circuit_keys.iter().map(|key| &key.0).collect_vec();
     let prove_time = start_timer!(|| format!("Generate proof for all {} tuples", tuples.len()));
-    let proof = api::prove(urs, pk, tuples.clone());
+    let proof = api::prove(urs, &pks, tuples);
     end_timer!(prove_time);
 
     // Note: proof verification should take negligible time,
+    let vks = circuit_keys.iter().map(|key| &key.1).collect_vec();
     let verify_time = start_timer!(|| format!("Verify proof for all {} tuples", tuples.len()));
-    api::verify_proof(urs, vk, tuples, &proof);
+    api::verify_proof(urs, &vks, tuples, &proof);
     end_timer!(verify_time);
 }
 
@@ -53,16 +62,16 @@ mod tests {
     fn it_works() {
         // generate `num` (pubkey, msg, signature)
         // with messages of length `msg_len`
-        let num = 1;
+        let num = 10;
         let msg_len = 50000;
         // let msg_len = 100;
         let tuples = console::generate_signatures(msg_len, num);
 
         // setup
         let urs = api::setup(1000, 1000, 1000);
-        let (pk, vk) = api::compile(&urs, msg_len);
+        let circuit_keys = api::compile(&urs, msg_len);
 
         // prove and verify
-        prove_and_verify(&urs, &pk, &vk, &tuples);
+        prove_and_verify(&urs, &circuit_keys, &tuples);
     }
 }

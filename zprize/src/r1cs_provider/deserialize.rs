@@ -2,7 +2,9 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::{fs::File, io::BufReader};
 
+use aleo_std_profiler::{end_timer, start_timer};
 use anyhow::{Context as _, Result};
+use scopeguard::defer;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -39,6 +41,11 @@ pub fn parse_file(
     assignment_file: impl AsRef<Path>,
     lookup_file: Option<impl AsRef<Path>>,
 ) -> Result<(R1CS, Assignment, Option<Lookup>)> {
+    let parse_time = start_timer!(|| "deserialize::parse_file()");
+    defer! {
+        end_timer!(parse_time);
+    }
+
     let file = File::open(r1cs_file)?;
     let reader = BufReader::new(file);
     let r1cs: R1CS = serde_cbor::from_reader(reader).context("error while parsing r1cs file")?;
@@ -69,23 +76,19 @@ mod tests {
 
     #[test]
     fn test_parse() -> Result<()> {
-        let file =
-            File::open("../gnark-plonky2-verifier/output/r1cs.cbor")?;
+        let file = File::open("../gnark-plonky2-verifier/output/r1cs.cbor")?;
         let reader = BufReader::new(file);
-        let r1cs: R1CS = serde_cbor::from_reader(reader)?;
+        let _r1cs: R1CS = serde_cbor::from_reader(reader)?;
         // println!("{:#?}", r1cs);
 
-        let file = File::open(
-            "../gnark-plonky2-verifier/output/assignment.cbor",
-        )?;
+        let file = File::open("../gnark-plonky2-verifier/output/assignment.cbor")?;
         let reader = BufReader::new(file);
-        let assignment: Assignment = serde_cbor::from_reader(reader)?;
+        let _assignment: Assignment = serde_cbor::from_reader(reader)?;
         // println!("{:#?}", assignment);
 
-        let file =
-            File::open("../gnark-plonky2-verifier/output/lookup.cbor")?;
+        let file = File::open("../gnark-plonky2-verifier/output/lookup.cbor")?;
         let reader = BufReader::new(file);
-        let lookup: Lookup = serde_cbor::from_reader(reader)?;
+        let _lookup: Lookup = serde_cbor::from_reader(reader)?;
         // println!("{:#?}", lookup);
         Ok(())
     }

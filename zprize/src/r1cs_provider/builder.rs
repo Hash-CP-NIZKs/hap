@@ -4,6 +4,7 @@ use std::path::Path;
 
 use aleo_std_profiler::{end_timer, start_timer};
 use anyhow::Result;
+use scopeguard::defer;
 use snarkvm_algorithms::r1cs::LookupTable;
 use snarkvm_circuit::Circuit as Env;
 use snarkvm_circuit::Field;
@@ -32,10 +33,13 @@ pub(crate) fn construct_r1cs_from_file(
     assignment_file: impl AsRef<Path>,
     lookup_file: Option<impl AsRef<Path>>,
 ) -> Result<()> {
-    let parse_time = start_timer!(|| "deserialize::parse_file()");
+    let construct_time = start_timer!(|| "builder::construct_r1cs_from_file()");
+    defer! {
+        end_timer!(construct_time);
+    }
+
     let (r1cs, assignment, lookup) =
         deserialize::parse_file(r1cs_file, assignment_file, lookup_file)?;
-    end_timer!(parse_time);
 
     let mut fields = assignment
         .variables

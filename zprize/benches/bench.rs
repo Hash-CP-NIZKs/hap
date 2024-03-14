@@ -21,7 +21,8 @@ fn criterion_benchmark(c: &mut Criterion) {
         .sampling_mode(criterion::SamplingMode::Flat); // for slow benchmarks
 
     // setup
-    let urs = zprize::api::setup(1000, 1000, 1000);
+    let urs = zprize::api::setup( 3812277, 7685631 ,1698481);
+
 
     // we generate 50 tuples for each bench
     // tuple = (public key, message, signature)

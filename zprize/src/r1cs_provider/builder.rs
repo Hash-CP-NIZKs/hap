@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::convert::From;
 use std::path::Path;
+use std::path::PathBuf;
 
 use aleo_std_profiler::{end_timer, start_timer};
 use anyhow::Result;
@@ -31,7 +32,7 @@ impl From<&BigInt> for Fp256<FrParameters> {
 pub(crate) fn construct_r1cs_from_file(
     r1cs_file: impl AsRef<Path>,
     assignment_file: impl AsRef<Path>,
-    lookup_file: Option<impl AsRef<Path>>,
+    lookup_file: Option<PathBuf>,
 ) -> Result<()> {
     let construct_time = start_timer!(|| "builder::construct_r1cs_from_file()");
     defer! {

@@ -6,9 +6,11 @@ use k256::elliptic_curve::sec1;
 use num_bigint::BigInt;
 use num_bigint::Sign;
 use scopeguard::defer;
+use snarkvm_utilities::Write;
 use std::env;
 use std::fs::File;
 use std::process::Command;
+use std::time::Instant;
 use tempfile::Builder;
 
 use crate::console;
@@ -24,8 +26,8 @@ fn u64_4_from_slice(x: &[u8]) -> [u64; 4] {
 }
 
 pub fn build_r1cs_for_verify_plonky2(
-    public_key: &console::ECDSAPublicKey,
-    signature: &console::ECDSASignature,
+    // public_key: console::ECDSAPublicKey,
+    // signature: console::ECDSASignature,
     msg: Vec<Vec<u8>>,
 ) -> Result<()> {
     let build_time = start_timer!(|| "build_r1cs_for_verify_plonky2()");
@@ -33,63 +35,75 @@ pub fn build_r1cs_for_verify_plonky2(
         end_timer!(build_time);
     }
 
-    let pk = if let sec1::Coordinates::Uncompressed { x, y } =
-        public_key.public_key.to_encoded_point(false).coordinates()
-    {
-        use plonky2_01::field::secp256k1_base::Secp256K1Base;
-        use plonky2_ecdsa::curve::curve_types::AffinePoint;
-        use plonky2_ecdsa::curve::ecdsa::ECDSAPublicKey;
-        use plonky2_ecdsa::curve::secp256k1::Secp256K1;
+    let msg_len = msg.len();
+    // let pk = if let sec1::Coordinates::Uncompressed { x, y } =
+    //     public_key.public_key.to_encoded_point(false).coordinates()
+    // {
+    //     use plonky2_01::field::secp256k1_base::Secp256K1Base;
+    //     use plonky2_ecdsa::curve::curve_types::AffinePoint;
+    //     use plonky2_ecdsa::curve::ecdsa::ECDSAPublicKey;
+    //     use plonky2_ecdsa::curve::secp256k1::Secp256K1;
 
-        ECDSAPublicKey(AffinePoint::<Secp256K1>::nonzero(
-            Secp256K1Base(u64_4_from_slice(&x.to_vec())),
-            Secp256K1Base(u64_4_from_slice(&y.to_vec())),
-        ))
-    } else {
-        unreachable!();
-    };
+    //     ECDSAPublicKey(AffinePoint::<Secp256K1>::nonzero(
+    //         Secp256K1Base(u64_4_from_slice(&x.to_vec())),
+    //         Secp256K1Base(u64_4_from_slice(&y.to_vec())),
+    //     ))
+    // } else {
+    //     unreachable!();
+    // };
 
-    let sig = {
-        use plonky2_01::field::secp256k1_scalar::Secp256K1Scalar;
-        use plonky2_ecdsa::curve::ecdsa::ECDSASignature;
-        use plonky2_ecdsa::curve::secp256k1::Secp256K1;
-        let (r, s) = signature.signature.split_bytes();
-        let r: Vec<u8> = r.to_vec();
-        let s: Vec<u8> = s.to_vec();
-        ECDSASignature {
-            r: Secp256K1Scalar(u64_4_from_slice(&r)),
-            s: Secp256K1Scalar(u64_4_from_slice(&s)),
-        }
-    };
-    let hash_input = (0..10000)
-        .map(|_| rand::random::<u8>())
-        .collect::<Vec<u8>>();
-
+    // let sig = {
+    //     use plonky2_01::field::secp256k1_scalar::Secp256K1Scalar;
+    //     use plonky2_ecdsa::curve::ecdsa::ECDSASignature;
+    //     use plonky2_ecdsa::curve::secp256k1::Secp256K1;
+    //     let (r, s) = signature.signature.split_bytes();
+    //     let r: Vec<u8> = r.to_vec();
+    //     let s: Vec<u8> = s.to_vec();
+    //     ECDSASignature {
+    //         r: Secp256K1Scalar(u64_4_from_slice(&r)),
+    //         s: Secp256K1Scalar(u64_4_from_slice(&s)),
+    //     }
+    // };
+    // let hash_input = (0..10000).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
+// --------
+    let start_time = Instant::now();
     // plonky2_ecdsa::curve::curve_types::AffinePoint::<plonky2_ecdsa::curve::secp256k1::Secp256K1>::nonzero(x, y)
     let _tmp_dir = Builder::new().prefix("zprize-ecdsa-varuna").tempdir()?;
     let tmp_dir = _tmp_dir.path();
     // plonky2 kecaak && ecdsa -> json -> garnk-plonky2 -> cbor
     // TODO: call ganrk-plonky2-verifier and gnark-ecdsa-test to generate R1CS
-    let (tuple, _hashes) =
-        plonky2_evm::hash2::prove_and_aggregate(pk, sig, vec![hash_input]).unwrap();
+    let (tuple, _) = plonky2_evm::hash2::prove_and_aggregate(msg).unwrap();
 
-    let common_data_file =
+    let mut common_data_file =
         File::create("../gnark-plonky2-verifier/testdata/zprize/common_circuit_data.json").unwrap();
-    serde_json::to_writer(&common_data_file, &tuple.2).unwrap();
-    println!("Succesfully wrote common circuit data to common_circuit_data.json");
+    let data = serde_json::to_vec(&tuple.2).unwrap();
+    common_data_file.write_all(&data).unwrap();
+    println!(
+        "Succesfully wrote common circuit data to common_circuit_data.json size{:?}",
+        data.len()
+    );
 
-    let verifier_data_file =
+    let mut verifier_data_file =
         File::create("../gnark-plonky2-verifier/testdata/zprize/verifier_only_circuit_data.json")
             .unwrap();
-    serde_json::to_writer(&verifier_data_file, &tuple.1).unwrap();
-    println!("Succesfully wrote verifier data to verifier_only_circuit_data.json");
+    let data = serde_json::to_vec(&tuple.1).unwrap();
+    verifier_data_file.write_all(&data).unwrap();
+    println!(
+        "Succesfully wrote verifier data to verifier_only_circuit_data.json  size{:?}",
+        data.len()
+    );
 
-    let proof_file =
+    let mut proof_file =
         File::create("../gnark-plonky2-verifier/testdata/zprize/proof_with_public_inputs.json")
             .unwrap();
-    serde_json::to_writer(&proof_file, &tuple.0).unwrap();
-    println!("Succesfully wrote proof to proof_with_public_inputs.json");
-
+    let data = serde_json::to_vec(&tuple.0).unwrap();
+    proof_file.write_all(&data).unwrap();
+    println!(
+        "Succesfully wrote proof to proof_with_public_inputs.json  size{:?}",
+        data.len()
+    );
+    let elapsed_time = start_time.elapsed();
+    println!("serde to json{:?}", elapsed_time);
     std::process::Command::new("../gnark-plonky2-verifier/benchmark")
         .args(&["-proof-system", "groth16", "-plonky2-circuit", "zprize"])
         .current_dir("/home/imlk/workspace/zprize/zprize-ecdsa-varuna/gnark-plonky2-verifier")
@@ -100,7 +114,8 @@ pub fn build_r1cs_for_verify_plonky2(
     let ret = super::builder::construct_r1cs_from_file(
         "../gnark-plonky2-verifier/output/r1cs.cbor",
         "../gnark-plonky2-verifier/output/assignment.cbor",
-        Some("../gnark-plonky2-verifier/output/lookup.cbor"),
+        None
+        // Some("../gnark-plonky2-verifier/output/lookup.cbor"),
     );
     ret
 }

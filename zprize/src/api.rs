@@ -32,8 +32,8 @@ use snarkvm_curves::bls12_377::{Bls12_377, Fq, Fr};
 use std::collections::BTreeMap;
 
 use crate::console;
-use crate::r1cs_provider;
 use crate::Tuples;
+use crate::{circuit, r1cs_provider};
 
 //
 // Aliases
@@ -57,8 +57,6 @@ pub fn run_circuit_keccak(
     Circuit::reset();
 
     r1cs_provider::gnark::build_r1cs_for_verify_plonky2(
-        public_key,
-        signature,
         vec![msg.into()], // TODO: optimize this alloc
     )
     .context("failed to build keccak circuit")
@@ -193,6 +191,13 @@ pub fn prove(
 ) -> varuna::Proof<Bls12_377> {
     let mut pks_to_constraints = BTreeMap::new();
 
+    Circuit::reset();
+    r1cs_provider::gnark::build_r1cs_for_verify_plonky2(
+        tuples.into_iter().map(|t| t.1.clone()).collect_vec(),
+    );
+    let assingment = vec![Circuit::eject_assignment_and_reset()];
+    
+
     let keccak_assignments;
     if crate::ENABLE_CIRCUIT_FOR_KECCAK {
         let keccak_pk = pks[0];
@@ -235,6 +240,7 @@ pub fn prove(
         }
         pks_to_constraints.insert(ecdsa_pk, &ecdsa_assignments[..]);
     }
+
 
     // Compute the proof.
     let rng = &mut OsRng::default();

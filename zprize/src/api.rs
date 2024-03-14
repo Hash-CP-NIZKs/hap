@@ -15,7 +15,7 @@
 use aleo_std_profiler::{end_timer, start_timer};
 use anyhow::Context;
 use rand::rngs::OsRng;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use sha3::{Digest, Keccak256};
 use snarkvm_algorithms::{
     crypto_hash::PoseidonSponge,
@@ -27,14 +27,15 @@ use snarkvm_circuit::{
     environment::{Assignment, Circuit},
     Environment as _,
 };
+use snarkvm_circuit_environment::SameCircuitAssignment;
 use snarkvm_console::{network::Testnet3 as Network, program::Itertools};
 use snarkvm_console_network::Network as _;
 use snarkvm_curves::bls12_377::{Bls12_377, Fq, Fr};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 use crate::console;
+use crate::r1cs_provider;
 use crate::Tuples;
-use crate::{circuit, r1cs_provider};
 
 //
 // Aliases
@@ -200,37 +201,57 @@ pub fn prove(
             // TODO: optimize this alloc
             tuples.iter().map(|t| t.1.clone()).collect_vec(),
         );
-        keccak_assignments = [keccak_assignment];
+        keccak_assignments = [SameCircuitAssignment::single_one(keccak_assignment)];
         pks_to_constraints.insert(keccak_pk, &keccak_assignments[..]);
     }
 
-    let mut ecdsa_assignments;
+    let ecdsa_assignments;
     if crate::ENABLE_CIRCUIT_FOR_ECDSA {
         let ecdsa_pk = if crate::ENABLE_CIRCUIT_FOR_KECCAK {
             pks[1]
         } else {
             pks[0]
         };
-        ecdsa_assignments = tuples
-            .into_par_iter()
-            .map(|tuple| {
-                // Note: we use a naive encoding here,
-                // you can modify it as long as a verifier can still pass tuples `(public key, msg, signature)`.
-                let (public_key, msg, signature) = tuple;
-                let assignment = run_circuit_ecdsa(
-                    &console::ECDSAPublicKey {
-                        public_key: public_key.clone(),
-                    },
-                    &console::ECDSASignature {
-                        signature: signature.clone(),
-                    },
-                    msg,
-                );
-                assignment
-            })
-            .collect::<Vec<_>>();
 
-        pks_to_constraints.insert(ecdsa_pk, &ecdsa_assignments[..]);
+        let base_assignment = run_circuit_ecdsa(
+            &console::ECDSAPublicKey {
+                public_key: tuples[0].0.clone(),
+            },
+            &console::ECDSASignature {
+                signature: tuples[0].2.clone(),
+            },
+            &tuples[0].1,
+        );
+
+        if tuples.len() == 1 {
+            ecdsa_assignments = vec![SameCircuitAssignment::single_one(base_assignment)];
+            pks_to_constraints.insert(ecdsa_pk, &ecdsa_assignments[..]);
+        } else {
+            let base_assignment = Arc::new(base_assignment);
+
+            let num_parallel_tasks = 5;
+            ecdsa_assignments = tuples
+                .into_par_iter()
+                .with_min_len(tuples.len() / num_parallel_tasks)
+                .map(|tuple| {
+                    // Note: we use a naive encoding here,
+                    // you can modify it as long as a verifier can still pass tuples `(public key, msg, signature)`.
+                    let (public_key, msg, signature) = tuple;
+                    let assignment = run_circuit_ecdsa(
+                        &console::ECDSAPublicKey {
+                            public_key: public_key.clone(),
+                        },
+                        &console::ECDSASignature {
+                            signature: signature.clone(),
+                        },
+                        msg,
+                    );
+                    SameCircuitAssignment::create_with_base(base_assignment.clone(), assignment)
+                })
+                .collect::<Vec<_>>();
+
+            pks_to_constraints.insert(ecdsa_pk, &ecdsa_assignments[..]);
+        }
     }
 
     // Compute the proof.
@@ -270,11 +291,6 @@ pub fn verify_proof(
         vks_to_inputs.insert(keccak_vk, &keccak_inputs[..]);
     }
 
-    // let mut inputs_i = vec![];
-    // for (_, input) in keccak_assignment.public_inputs() {
-    //     inputs_i.push(*input);
-    // }
-
     let mut ecdsa_inputs;
     if crate::ENABLE_CIRCUIT_FOR_ECDSA {
         let ecdsa_vk = if crate::ENABLE_CIRCUIT_FOR_KECCAK {
@@ -282,6 +298,8 @@ pub fn verify_proof(
         } else {
             vks[0]
         };
+
+        // TODO: optimize memory usage with SameCircuitAssignment
         ecdsa_inputs = Vec::with_capacity(tuples.len());
         for tuple in tuples {
             // Note: we use a naive encoding here,

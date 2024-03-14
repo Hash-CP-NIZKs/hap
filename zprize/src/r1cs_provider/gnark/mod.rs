@@ -28,14 +28,14 @@ fn u64_4_from_slice(x: &[u8]) -> [u64; 4] {
 pub fn build_r1cs_for_verify_plonky2(
     // public_key: console::ECDSAPublicKey,
     // signature: console::ECDSASignature,
-    msg: Vec<Vec<u8>>,
+    msgs: Vec<Vec<u8>>,
 ) -> Result<()> {
     let build_time = start_timer!(|| "build_r1cs_for_verify_plonky2()");
     defer! {
         end_timer!(build_time);
     }
 
-    let msg_len = msg.len();
+    // let msg_len = msg.len();
     // let pk = if let sec1::Coordinates::Uncompressed { x, y } =
     //     public_key.public_key.to_encoded_point(false).coordinates()
     // {
@@ -65,14 +65,14 @@ pub fn build_r1cs_for_verify_plonky2(
     //     }
     // };
     // let hash_input = (0..10000).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
-// --------
+    // --------
     let start_time = Instant::now();
     // plonky2_ecdsa::curve::curve_types::AffinePoint::<plonky2_ecdsa::curve::secp256k1::Secp256K1>::nonzero(x, y)
     let _tmp_dir = Builder::new().prefix("zprize-ecdsa-varuna").tempdir()?;
     let tmp_dir = _tmp_dir.path();
     // plonky2 kecaak && ecdsa -> json -> garnk-plonky2 -> cbor
     // TODO: call ganrk-plonky2-verifier and gnark-ecdsa-test to generate R1CS
-    let (tuple, _) = plonky2_evm::hash2::prove_and_aggregate(msg).unwrap();
+    let (tuple, _) = plonky2_evm::hash2::prove_and_aggregate(msgs).unwrap();
 
     let mut common_data_file =
         File::create("../gnark-plonky2-verifier/testdata/zprize/common_circuit_data.json").unwrap();
@@ -114,8 +114,7 @@ pub fn build_r1cs_for_verify_plonky2(
     let ret = super::builder::construct_r1cs_from_file(
         "../gnark-plonky2-verifier/output/r1cs.cbor",
         "../gnark-plonky2-verifier/output/assignment.cbor",
-        None
-        // Some("../gnark-plonky2-verifier/output/lookup.cbor"),
+        None, // Some("../gnark-plonky2-verifier/output/lookup.cbor"),
     );
     ret
 }

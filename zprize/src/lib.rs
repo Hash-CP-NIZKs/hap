@@ -69,7 +69,7 @@ mod tests {
 
         // setup
         let urs = api::setup(1000, 1000, 1000);
-        let circuit_keys = api::compile(&urs, msg_len);
+        let circuit_keys = api::compile(&urs, num, msg_len);
 
         // prove and verify
         prove_and_verify(&urs, &circuit_keys, &tuples);

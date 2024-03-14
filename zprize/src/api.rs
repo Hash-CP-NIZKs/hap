@@ -48,19 +48,13 @@ type VarunaInst = varuna::VarunaSNARK<Bls12_377, FS, VarunaHidingMode>;
 // =========
 //
 
-pub fn run_circuit_keccak(
-    public_key: &console::ECDSAPublicKey, // TODO: remove this
-    signature: &console::ECDSASignature,
-    msg: &[u8],
-) -> Assignment<Fr> {
+pub fn run_circuit_keccak(msgs: Vec<Vec<u8>>) -> Assignment<Fr> {
     // reset circuit writer
     Circuit::reset();
 
-    r1cs_provider::gnark::build_r1cs_for_verify_plonky2(
-        vec![msg.into()], // TODO: optimize this alloc
-    )
-    .context("failed to build keccak circuit")
-    .unwrap();
+    r1cs_provider::gnark::build_r1cs_for_verify_plonky2(msgs)
+        .context("failed to build keccak circuit")
+        .unwrap();
 
     // return circuit
     Circuit::eject_assignment_and_reset()
@@ -112,6 +106,7 @@ pub fn setup(
 /// Compile the circuit.
 pub fn compile(
     urs: &UniversalParams<Bls12_377>,
+    tuple_num: usize,
     msg_len: usize,
 ) -> Vec<(
     CircuitProvingKey<Bls12_377, VarunaHidingMode>,
@@ -124,7 +119,13 @@ pub fn compile(
 
     if crate::ENABLE_CIRCUIT_FOR_KECCAK {
         // Let's get a keccak circuit
-        let keccak_circuit = run_circuit_keccak(&public_key, &signature, &msg);
+        let keccak_circuit = run_circuit_keccak(
+            // TODO: optimize this alloc
+            (0..tuple_num)
+                .into_iter()
+                .map(|_| msg.clone())
+                .collect_vec(),
+        );
         println!(
             "keccak_circuit: num constraints: {}",
             keccak_circuit.num_constraints()
@@ -191,25 +192,12 @@ pub fn prove(
 ) -> varuna::Proof<Bls12_377> {
     let mut pks_to_constraints = BTreeMap::new();
 
-    Circuit::reset();
-    r1cs_provider::gnark::build_r1cs_for_verify_plonky2(
-        tuples.into_iter().map(|t| t.1.clone()).collect_vec(),
-    );
-    let assingment = vec![Circuit::eject_assignment_and_reset()];
-    
-
     let keccak_assignments;
     if crate::ENABLE_CIRCUIT_FOR_KECCAK {
         let keccak_pk = pks[0];
         let keccak_assignment = run_circuit_keccak(
-            // TODO: collect all msg and pass to run_circuit_keccak
-            &console::ECDSAPublicKey {
-                public_key: tuples[0].0,
-            },
-            &console::ECDSASignature {
-                signature: tuples[0].2,
-            },
-            &tuples[0].1,
+            // TODO: optimize this alloc
+            tuples.iter().map(|t| t.1.clone()).collect_vec(),
         );
         keccak_assignments = [keccak_assignment];
         pks_to_constraints.insert(keccak_pk, &keccak_assignments[..]);
@@ -241,7 +229,6 @@ pub fn prove(
         pks_to_constraints.insert(ecdsa_pk, &ecdsa_assignments[..]);
     }
 
-
     // Compute the proof.
     let rng = &mut OsRng::default();
     let universal_prover = urs.to_universal_prover().unwrap();
@@ -267,14 +254,8 @@ pub fn verify_proof(
     if crate::ENABLE_CIRCUIT_FOR_KECCAK {
         let keccak_vk = vks[0];
         let keccak_assignment = run_circuit_keccak(
-            // TODO: collect all msg and pass to run_circuit_keccak
-            &console::ECDSAPublicKey {
-                public_key: tuples[0].0,
-            },
-            &console::ECDSASignature {
-                signature: tuples[0].2,
-            },
-            &tuples[0].1,
+            // TODO: optimize this alloc
+            tuples.iter().map(|t| t.1.clone()).collect_vec(),
         );
         let keccak_input = keccak_assignment
             .public_inputs()

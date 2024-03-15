@@ -28,14 +28,19 @@ pub mod circuit;
 pub mod console;
 pub mod r1cs_provider;
 
-// Config code here for testing KECCAK or ECDSA only
-pub const ENABLE_CIRCUIT_FOR_KECCAK: bool = true;
-pub const ENABLE_CIRCUIT_FOR_ECDSA: bool = false;
+#[derive(Debug, Copy, Clone)]
+pub enum CircuitRunType {
+    RunKeccakOnly,
+    RunEcdsaOnly,
+    RunKeccakAndEcdsa,  /* In one prove_batch() */
+    RunKeccakThenEcdsa, /* Run keccak prove_batch() and then ecdsa prove_batch() */
+}
 
 /// A (public key, msg, signature) tuple.
 pub type Tuples<'a> = &'a [(VerifyingKey, Vec<u8>, Signature)];
 
 pub fn prove_and_verify(
+    run_type: CircuitRunType,
     urs: &UniversalParams<Bls12_377>,
     circuit_keys: &[(
         CircuitProvingKey<Bls12_377, VarunaHidingMode>,
@@ -43,13 +48,50 @@ pub fn prove_and_verify(
     )],
     tuples: Tuples,
 ) {
-    // TODO: test could be adjusted to pass references and clone less
+    println!("compile({run_type:?}) tuple_num: {}", tuples.len());
+
+    if matches!(run_type, CircuitRunType::RunKeccakThenEcdsa) {
+        /* First, we run prove and verify for keccak only, then run for ecdsa only */
+        let keccak_part_time =
+            start_timer!(|| "prove_and_verify(RunKeccakThenEcdsa) run keccak part");
+        prove_and_verify_internal(
+            CircuitRunType::RunKeccakOnly,
+            urs,
+            &[&circuit_keys[0]],
+            tuples,
+        );
+        end_timer!(keccak_part_time);
+
+        let ecdsa_part_time =
+            start_timer!(|| "prove_and_verify(RunKeccakThenEcdsa) run ecdsa part");
+        prove_and_verify_internal(
+            CircuitRunType::RunEcdsaOnly,
+            urs,
+            &[&circuit_keys[1]],
+            tuples,
+        );
+        end_timer!(ecdsa_part_time);
+    } else {
+        let circuit_keys = circuit_keys.iter().collect_vec();
+        prove_and_verify_internal(run_type, urs, &circuit_keys, tuples);
+    }
+}
+
+fn prove_and_verify_internal(
+    run_type: CircuitRunType,
+    urs: &UniversalParams<Bls12_377>,
+    circuit_keys: &[&(
+        CircuitProvingKey<Bls12_377, VarunaHidingMode>,
+        CircuitVerifyingKey<Bls12_377>,
+    )],
+    tuples: Tuples,
+) {
     let pks = circuit_keys.iter().map(|key| &key.0).collect_vec();
     let prove_time = start_timer!(|| format!("Generate proof for all {} tuples", tuples.len()));
-    let (proof, all_inputs) = api::prove(urs, &pks, tuples);
+    let (proof, all_inputs) = api::prove(run_type, urs, &pks, tuples);
     end_timer!(prove_time);
 
-    // Note: proof verification should take negligible time,
+    /* Prepare vks_to_inputs for verifier */
     let mut vks_to_inputs = BTreeMap::new();
     circuit_keys
         .iter()
@@ -58,6 +100,8 @@ pub fn prove_and_verify(
         .for_each(|(vks, inputs)| {
             vks_to_inputs.insert(vks, &inputs[..]);
         });
+
+    // Note: proof verification should take negligible time,
     let verify_time = start_timer!(|| format!("Verify proof for all {} tuples", tuples.len()));
     api::verify_proof(urs, &proof, &vks_to_inputs);
     end_timer!(verify_time);
@@ -73,19 +117,24 @@ mod tests {
 
     #[test]
     fn it_works() {
+        // Config code here for testing KECCAK or ECDSA only
+        // let run_type = CircuitRunType::RunKeccakOnly;
+        // let run_type = CircuitRunType::RunEcdsaOnly;
+        let run_type = CircuitRunType::RunKeccakAndEcdsa;
+
         // generate `num` (pubkey, msg, signature)
         // with messages of length `msg_len`
-        let num = 10;
+        let num = 50;
         let msg_len = 50000;
         // let msg_len = 100;
         let tuples = console::generate_signatures(msg_len, num);
 
         // setup
-        let urs = api::setup(1000, 1000, 1000);
-        let circuit_keys = api::compile(&urs, num, msg_len);
+        let urs = api::setup(3812277, 7685631, 1698481);
+        let circuit_keys = api::compile(run_type, &urs, num, msg_len);
 
         // prove and verify
-        prove_and_verify(&urs, &circuit_keys, &tuples);
+        prove_and_verify(run_type, &urs, &circuit_keys, &tuples);
     }
 
     #[test]

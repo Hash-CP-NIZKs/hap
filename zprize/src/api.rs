@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use aleo_std_profiler::{end_timer, start_timer};
-use anyhow::Context;
+use anyhow::{bail, Context};
 use rand::rngs::OsRng;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use sha3::{Digest, Keccak256};
@@ -33,9 +33,9 @@ use snarkvm_console_network::Network as _;
 use snarkvm_curves::bls12_377::{Bls12_377, Fq, Fr};
 use std::{collections::BTreeMap, sync::Arc};
 
-use crate::console;
 use crate::r1cs_provider;
 use crate::Tuples;
+use crate::{console, CircuitRunType};
 
 //
 // Aliases
@@ -107,6 +107,7 @@ pub fn setup(
 
 /// Compile the circuit.
 pub fn compile(
+    run_type: CircuitRunType,
     urs: &UniversalParams<Bls12_377>,
     tuple_num: usize,
     msg_len: usize,
@@ -114,12 +115,20 @@ pub fn compile(
     CircuitProvingKey<Bls12_377, VarunaHidingMode>,
     CircuitVerifyingKey<Bls12_377>,
 )> {
+    println!("compile({run_type:?}) tuple_num: {tuple_num} msg_len: {msg_len})");
+
+    /* Sample some tuples */
     let msg = console::sample_msg(msg_len);
     let (public_key, signature) = console::sample_pubkey_sig(&msg);
 
     let mut unique_circuits = vec![];
 
-    if crate::ENABLE_CIRCUIT_FOR_KECCAK {
+    if matches!(
+        run_type,
+        CircuitRunType::RunKeccakOnly
+            | CircuitRunType::RunKeccakAndEcdsa
+            | CircuitRunType::RunKeccakThenEcdsa
+    ) {
         // Let's get a keccak circuit
         let keccak_circuit = run_circuit_keccak(
             // TODO: optimize this alloc
@@ -155,7 +164,12 @@ pub fn compile(
         unique_circuits.push(keccak_circuit);
     }
 
-    if crate::ENABLE_CIRCUIT_FOR_ECDSA {
+    if matches!(
+        run_type,
+        CircuitRunType::RunEcdsaOnly
+            | CircuitRunType::RunKeccakAndEcdsa
+            | CircuitRunType::RunKeccakThenEcdsa
+    ) {
         // Let's get a ecdsa circuit
         let ecdsa_circuit = run_circuit_ecdsa(&public_key, &signature, &msg);
         println!(
@@ -182,20 +196,42 @@ pub fn compile(
         unique_circuits.push(ecdsa_circuit);
     }
 
-    let unique_circuits = unique_circuits.iter().map(|c| c).collect_vec();
-    VarunaInst::batch_circuit_setup(&urs, &unique_circuits).unwrap()
+    if !matches!(run_type, CircuitRunType::RunKeccakThenEcdsa) {
+        /* If it is RunKeccakThenEcdsa, we have to run batch_circuit_setup() for keccak and ecdsa separately. */
+        let mut r0 = VarunaInst::batch_circuit_setup(&urs, &[&unique_circuits[0]])
+            .with_context(|| format!("VarunaInst::batch_circuit_setup() for circuit: keccak"))
+            .unwrap();
+        let r1 = VarunaInst::batch_circuit_setup(&urs, &[&unique_circuits[1]])
+            .with_context(|| format!("VarunaInst::batch_circuit_setup() for circuit: ecdsa"))
+            .unwrap();
+        r0.extend(r1);
+        r0
+    } else {
+        /* If it is RunKeccaOnly or RunEcdsaOnly or RunKeccakAndEcdsa, just run batch_circuit_setup() once. */
+        let unique_circuits = unique_circuits.iter().map(|c| c).collect_vec();
+        VarunaInst::batch_circuit_setup(&urs, &unique_circuits).unwrap()
+    }
 }
 
 /// Run and prove the circuit.
 pub fn prove(
+    run_type: CircuitRunType,
     urs: &UniversalParams<Bls12_377>,
     pks: &[&CircuitProvingKey<Bls12_377, VarunaHidingMode>],
     tuples: Tuples,
 ) -> (varuna::Proof<Bls12_377>, Vec<Vec<Vec<Fr>>>) {
+    if matches!(run_type, CircuitRunType::RunKeccakThenEcdsa) {
+        /* RunKeccakThenEcdsa should be handled by prove_and_verify() */
+        panic!("CircuitRunType::RunKeccakThenEcdsa should not be here !");
+    }
+
     let mut pks_to_constraints = BTreeMap::new();
 
     let mut keccak_assignments = None;
-    if crate::ENABLE_CIRCUIT_FOR_KECCAK {
+    if matches!(
+        run_type,
+        CircuitRunType::RunKeccakOnly | CircuitRunType::RunKeccakAndEcdsa
+    ) {
         let keccak_pk = pks[0];
         let keccak_assignment = run_circuit_keccak(
             // TODO: optimize this alloc
@@ -206,11 +242,14 @@ pub fn prove(
     }
 
     let mut ecdsa_assignments = None;
-    if crate::ENABLE_CIRCUIT_FOR_ECDSA {
-        let ecdsa_pk = if crate::ENABLE_CIRCUIT_FOR_KECCAK {
-            pks[1]
-        } else {
-            pks[0]
+    if matches!(
+        run_type,
+        CircuitRunType::RunEcdsaOnly | CircuitRunType::RunKeccakAndEcdsa
+    ) {
+        let ecdsa_pk = match run_type {
+            CircuitRunType::RunEcdsaOnly => pks[0],
+            CircuitRunType::RunKeccakAndEcdsa => pks[1],
+            _ => unreachable!(),
         };
 
         let base_assignment = run_circuit_ecdsa(
@@ -264,9 +303,13 @@ pub fn prove(
     let proof =
         VarunaInst::prove_batch(&universal_prover, fiat_shamir, &pks_to_constraints, rng).unwrap();
 
+    /* Prepare inputs for verifier, this should be verify fast since it is just memory copy ... */
     let mut all_inputs = vec![];
 
-    if crate::ENABLE_CIRCUIT_FOR_KECCAK {
+    if matches!(
+        run_type,
+        CircuitRunType::RunKeccakOnly | CircuitRunType::RunKeccakAndEcdsa
+    ) {
         let keccak_inputs = keccak_assignments
             .as_ref()
             .unwrap()
@@ -282,7 +325,10 @@ pub fn prove(
         all_inputs.push(keccak_inputs);
     }
 
-    if crate::ENABLE_CIRCUIT_FOR_ECDSA {
+    if matches!(
+        run_type,
+        CircuitRunType::RunEcdsaOnly | CircuitRunType::RunKeccakAndEcdsa
+    ) {
         let ecdsa_inputs = ecdsa_assignments
             .as_ref()
             .unwrap()

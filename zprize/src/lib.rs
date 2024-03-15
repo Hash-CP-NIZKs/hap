@@ -141,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    fn download_towns_of_blobs() -> Result<()> {
+    fn download_tons_of_blobs() -> Result<()> {
         snarkvm_parameters::testnet3::Degree16::load_bytes()?;
         snarkvm_parameters::testnet3::Degree17::load_bytes()?;
         snarkvm_parameters::testnet3::Degree18::load_bytes()?;

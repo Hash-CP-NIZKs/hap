@@ -30,6 +30,17 @@
     just build-gnark
     ```
 
+5. Download blobs
+   
+    Before the first time you generate proof with this project, it would be better to download some of Aleo's blobs in advance. Those files are required by snarkVM, and they will be saved at `~/.aleo`.
+
+    ```sh
+    cargo test --package zprize --lib -- tests::download_tons_of_blobs --exact --nocapture
+    ```
+
+    Note this is a one-time operation, and you only need to call this once.
+
+
 ### Run the benchmark
 
 Run the bench with:

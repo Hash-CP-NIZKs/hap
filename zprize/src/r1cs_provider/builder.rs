@@ -67,6 +67,16 @@ pub(crate) fn construct_r1cs_from_file(
 
     let (mut count_non_zero_a, mut count_non_zero_b) = (0usize, 0usize);
 
+    /* Count nun zeros on lookup constrains */
+    if let Some(lookup) = &lookup {
+        /* We only need to count for A, since B and C are all zeros */
+        let count_num_zero_lookup_a = lookup
+            .constraints
+            .iter()
+            .fold(0, |acc, constraint| acc + constraint.a.len());
+        count_non_zero_a += count_num_zero_lookup_a;
+    }
+
     r1cs.0.iter().try_for_each(|constraint| -> Result<_> {
         let mut a = func_convert_lc(&constraint.a)?;
         let mut b = func_convert_lc(&constraint.b)?;
@@ -102,7 +112,6 @@ pub(crate) fn construct_r1cs_from_file(
             let b = EF::from(item[1]);
             let c = EF::from(item[2]);
 
-            let (a, c) = (c, a); /* Swap a and c, so that A = 0, B = 0, while C = <0...max(range to check)> */
             table.fill([a, b], c);
             Ok(())
         })?;
@@ -117,7 +126,6 @@ pub(crate) fn construct_r1cs_from_file(
                 let b = func_convert_lc(&constraint.b)?;
                 let c = func_convert_lc(&constraint.c)?;
 
-                let (a, c) = (c, a); /* Swap a and c, so that A = 0, B = 0, while C = <value to query> */
                 Env::enforce_lookup(|| (a, b, c, table_index));
                 Ok(())
             })?;

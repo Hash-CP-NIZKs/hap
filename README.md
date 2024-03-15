@@ -1,3 +1,5 @@
+Please read [this doc](./Documentation%20for%20Zprize3.pdf) for the solution of the prize3.
+
 For the steps to run this project, please read our [writeup](writeup.md) :\)
 
 # Zprize: High Throughput Signature Verification

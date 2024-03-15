@@ -65,10 +65,31 @@ pub(crate) fn construct_r1cs_from_file(
         Ok(f)
     };
 
+    let (mut count_non_zero_a, mut count_non_zero_b) = (0usize, 0usize);
+
     r1cs.0.iter().try_for_each(|constraint| -> Result<_> {
-        let a = func_convert_lc(&constraint.a)?;
-        let b = func_convert_lc(&constraint.b)?;
+        let mut a = func_convert_lc(&constraint.a)?;
+        let mut b = func_convert_lc(&constraint.b)?;
         let c = func_convert_lc(&constraint.c)?;
+
+        let mut len_a = constraint.a.len();
+        let mut len_b = constraint.b.len();
+
+        if (len_a < len_b && count_non_zero_a < count_non_zero_b)
+            || (len_a > len_b && count_non_zero_a > count_non_zero_b)
+        {
+            /* Swap a and b to make non zeros values of A and B more balance. */
+            let t = b;
+            b = a;
+            a = t;
+
+            let t = len_b;
+            len_b = len_a;
+            len_a = t;
+        }
+
+        count_non_zero_a += len_a;
+        count_non_zero_b += len_b;
 
         Env::enforce(|| (a, b, c));
         Ok(())
@@ -77,7 +98,12 @@ pub(crate) fn construct_r1cs_from_file(
     if let Some(lookup) = lookup {
         let mut table = LookupTable::default();
         lookup.table.0.iter().try_for_each(|item| -> Result<_> {
-            table.fill([EF::from(item[0]), EF::from(item[1])], EF::from(item[2]));
+            let a = EF::from(item[0]);
+            let b = EF::from(item[1]);
+            let c = EF::from(item[2]);
+
+            let (a, c) = (c, a); /* Swap a and c, so that A = 0, B = 0, while C = <0...max(range to check)> */
+            table.fill([a, b], c);
             Ok(())
         })?;
         Env::add_lookup_table(table);
@@ -91,6 +117,7 @@ pub(crate) fn construct_r1cs_from_file(
                 let b = func_convert_lc(&constraint.b)?;
                 let c = func_convert_lc(&constraint.c)?;
 
+                let (a, c) = (c, a); /* Swap a and c, so that A = 0, B = 0, while C = <value to query> */
                 Env::enforce_lookup(|| (a, b, c, table_index));
                 Ok(())
             })?;

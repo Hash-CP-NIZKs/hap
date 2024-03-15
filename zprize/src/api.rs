@@ -191,21 +191,21 @@ pub fn prove(
     urs: &UniversalParams<Bls12_377>,
     pks: &[&CircuitProvingKey<Bls12_377, VarunaHidingMode>],
     tuples: Tuples,
-) -> varuna::Proof<Bls12_377> {
+) -> (varuna::Proof<Bls12_377>, Vec<Vec<Vec<Fr>>>) {
     let mut pks_to_constraints = BTreeMap::new();
 
-    let keccak_assignments;
+    let mut keccak_assignments = None;
     if crate::ENABLE_CIRCUIT_FOR_KECCAK {
         let keccak_pk = pks[0];
         let keccak_assignment = run_circuit_keccak(
             // TODO: optimize this alloc
             tuples.iter().map(|t| t.1.clone()).collect_vec(),
         );
-        keccak_assignments = [SameCircuitAssignment::single_one(keccak_assignment)];
-        pks_to_constraints.insert(keccak_pk, &keccak_assignments[..]);
+        keccak_assignments = Some([SameCircuitAssignment::single_one(keccak_assignment)]);
+        pks_to_constraints.insert(keccak_pk, &keccak_assignments.as_ref().unwrap()[..]);
     }
 
-    let ecdsa_assignments;
+    let mut ecdsa_assignments = None;
     if crate::ENABLE_CIRCUIT_FOR_ECDSA {
         let ecdsa_pk = if crate::ENABLE_CIRCUIT_FOR_KECCAK {
             pks[1]
@@ -224,33 +224,36 @@ pub fn prove(
         );
 
         if tuples.len() == 1 {
-            ecdsa_assignments = vec![SameCircuitAssignment::single_one(base_assignment)];
-            pks_to_constraints.insert(ecdsa_pk, &ecdsa_assignments[..]);
+            ecdsa_assignments = Some(vec![SameCircuitAssignment::single_one(base_assignment)]);
+            pks_to_constraints.insert(ecdsa_pk, &ecdsa_assignments.as_ref().unwrap()[..]);
         } else {
             let base_assignment = Arc::new(base_assignment);
 
+            /* limit num of parallel tasks here for saving memory */
             let num_parallel_tasks = 5;
-            ecdsa_assignments = tuples
-                .into_par_iter()
-                .with_min_len(tuples.len() / num_parallel_tasks)
-                .map(|tuple| {
-                    // Note: we use a naive encoding here,
-                    // you can modify it as long as a verifier can still pass tuples `(public key, msg, signature)`.
-                    let (public_key, msg, signature) = tuple;
-                    let assignment = run_circuit_ecdsa(
-                        &console::ECDSAPublicKey {
-                            public_key: public_key.clone(),
-                        },
-                        &console::ECDSASignature {
-                            signature: signature.clone(),
-                        },
-                        msg,
-                    );
-                    SameCircuitAssignment::create_with_base(base_assignment.clone(), assignment)
-                })
-                .collect::<Vec<_>>();
+            ecdsa_assignments = Some(
+                tuples
+                    .into_par_iter()
+                    .with_min_len(tuples.len() / num_parallel_tasks)
+                    .map(|tuple| {
+                        // Note: we use a naive encoding here,
+                        // you can modify it as long as a verifier can still pass tuples `(public key, msg, signature)`.
+                        let (public_key, msg, signature) = tuple;
+                        let assignment = run_circuit_ecdsa(
+                            &console::ECDSAPublicKey {
+                                public_key: public_key.clone(),
+                            },
+                            &console::ECDSASignature {
+                                signature: signature.clone(),
+                            },
+                            msg,
+                        );
+                        SameCircuitAssignment::create_with_base(base_assignment.clone(), assignment)
+                    })
+                    .collect::<Vec<_>>(),
+            );
 
-            pks_to_constraints.insert(ecdsa_pk, &ecdsa_assignments[..]);
+            pks_to_constraints.insert(ecdsa_pk, &ecdsa_assignments.as_ref().unwrap()[..]);
         }
     }
 
@@ -260,77 +263,56 @@ pub fn prove(
     let fiat_shamir = Network::varuna_fs_parameters();
     let proof =
         VarunaInst::prove_batch(&universal_prover, fiat_shamir, &pks_to_constraints, rng).unwrap();
-    proof
+
+    let mut all_inputs = vec![];
+
+    if crate::ENABLE_CIRCUIT_FOR_KECCAK {
+        let keccak_inputs = keccak_assignments
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|assignment| {
+                assignment
+                    .public_inputs()
+                    .iter()
+                    .map(|(_, input)| *input)
+                    .collect_vec()
+            })
+            .collect_vec();
+        all_inputs.push(keccak_inputs);
+    }
+
+    if crate::ENABLE_CIRCUIT_FOR_ECDSA {
+        let ecdsa_inputs = ecdsa_assignments
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|assignment| {
+                assignment
+                    .public_inputs()
+                    .iter()
+                    .map(|(_, input)| *input)
+                    .collect_vec()
+            })
+            .collect_vec();
+        all_inputs.push(ecdsa_inputs);
+    }
+
+    (proof, all_inputs)
 }
 
 /// Verify a proof.
 pub fn verify_proof(
     urs: &UniversalParams<Bls12_377>,
-    vks: &[&CircuitVerifyingKey<Bls12_377>],
-    tuples: Tuples,
     proof: &varuna::Proof<Bls12_377>,
+    vks_to_inputs: &BTreeMap<&CircuitVerifyingKey<Bls12_377>, &[Vec<Fr>]>,
 ) {
-    // Note: this is a hacky way of formatting public inputs,
-    // we shouldn't have to run the circuit to do that.
-
-    let mut vks_to_inputs = BTreeMap::new();
-
-    let keccak_inputs;
-    if crate::ENABLE_CIRCUIT_FOR_KECCAK {
-        let keccak_vk = vks[0];
-        let keccak_assignment = run_circuit_keccak(
-            // TODO: optimize this alloc
-            tuples.iter().map(|t| t.1.clone()).collect_vec(),
-        );
-        let keccak_input = keccak_assignment
-            .public_inputs()
-            .iter()
-            .map(|(_, input)| *input)
-            .collect_vec();
-        keccak_inputs = [keccak_input];
-        vks_to_inputs.insert(keccak_vk, &keccak_inputs[..]);
-    }
-
-    let mut ecdsa_inputs;
-    if crate::ENABLE_CIRCUIT_FOR_ECDSA {
-        let ecdsa_vk = if crate::ENABLE_CIRCUIT_FOR_KECCAK {
-            vks[1]
-        } else {
-            vks[0]
-        };
-
-        // TODO: optimize memory usage with SameCircuitAssignment
-        ecdsa_inputs = Vec::with_capacity(tuples.len());
-        for tuple in tuples {
-            // Note: we use a naive encoding here,
-            // you can modify it as long as a verifier can still pass tuples `(public key, msg, signature)`.
-            let (public_key, msg, signature) = tuple;
-            let ecdsa_assignment = run_circuit_ecdsa(
-                &console::ECDSAPublicKey {
-                    public_key: public_key.clone(),
-                },
-                &console::ECDSASignature {
-                    signature: signature.clone(),
-                },
-                msg,
-            );
-            ecdsa_inputs.push(
-                ecdsa_assignment
-                    .public_inputs()
-                    .iter()
-                    .map(|(_, input)| *input)
-                    .collect_vec(),
-            );
-        }
-        vks_to_inputs.insert(ecdsa_vk, &ecdsa_inputs[..]);
-    }
-
     // verify
     let fiat_shamir = Network::varuna_fs_parameters();
     let universal_verifier = urs.to_universal_verifier().unwrap();
 
     // Note: same comment here, verify_batch could verify several proofs instead of one ;)
     let time = start_timer!(|| "Run VarunaInst::verify_batch()");
-    VarunaInst::verify_batch(&universal_verifier, fiat_shamir, &vks_to_inputs, proof).unwrap();
+    VarunaInst::verify_batch(&universal_verifier, fiat_shamir, vks_to_inputs, proof).unwrap();
     end_timer!(time);
 }

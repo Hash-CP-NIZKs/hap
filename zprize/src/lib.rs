@@ -44,13 +44,20 @@ pub fn prove_and_verify(
     // TODO: test could be adjusted to pass references and clone less
     let pks = circuit_keys.iter().map(|key| &key.0).collect_vec();
     let prove_time = start_timer!(|| format!("Generate proof for all {} tuples", tuples.len()));
-    let proof = api::prove(urs, &pks, tuples);
+    let (proof, all_inputs) = api::prove(urs, &pks, tuples);
     end_timer!(prove_time);
 
     // Note: proof verification should take negligible time,
-    let vks = circuit_keys.iter().map(|key| &key.1).collect_vec();
+    let mut vks_to_inputs = BTreeMap::new();
+    circuit_keys
+        .iter()
+        .map(|key| &key.1)
+        .zip_eq(&all_inputs)
+        .for_each(|(vks, inputs)| {
+            vks_to_inputs.insert(vks, &inputs[..]);
+        });
     let verify_time = start_timer!(|| format!("Verify proof for all {} tuples", tuples.len()));
-    api::verify_proof(urs, &vks, tuples, &proof);
+    api::verify_proof(urs, &proof, &vks_to_inputs);
     end_timer!(verify_time);
 }
 

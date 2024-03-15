@@ -3028,6 +3028,7 @@ dependencies = [
  "snarkvm-console",
  "snarkvm-console-network",
  "snarkvm-curves",
+ "snarkvm-parameters",
  "snarkvm-utilities",
  "tempfile",
  "time",

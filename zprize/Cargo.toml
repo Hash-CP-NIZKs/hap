@@ -13,6 +13,7 @@ snarkvm-curves = { git = "https://github.com/AleoHQ/snarkVM", branch = "zprize_2
 snarkvm-circuit-environment = { git = "https://github.com/AleoHQ/snarkVM", branch = "zprize_2023" }
 snarkvm-console-network = { git = "https://github.com/AleoHQ/snarkVM", branch = "zprize_2023" }
 snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM", branch = "zprize_2023" }
+snarkvm-parameters = { git = "https://github.com/AleoHQ/snarkVM", branch = "zprize_2023" }
 plonky2_evm = { path = "../evm/evm" }
 rand = "0.8.5"
 k256 = { version = "0.13", features = ["ecdsa"] }
@@ -43,6 +44,7 @@ snarkvm-curves = { path = '../snarkVM/curves' }
 snarkvm-circuit-environment = { path = '../snarkVM/circuit/environment' }
 snarkvm-console-network = { path = '../snarkVM/console/network' }
 snarkvm-utilities = { path = '../snarkVM/utilities' }
+snarkvm-parameters = { path = '../snarkVM/parameters' }
 
 [patch.crates-io]
 plonky2 = { git = "ssh://git@github.com/zproof/evm.git", branch = "v012" }

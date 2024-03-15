@@ -58,6 +58,8 @@ pub fn prove_and_verify(
 mod tests {
     use super::*;
 
+    use anyhow::Result;
+
     #[test]
     fn it_works() {
         // generate `num` (pubkey, msg, signature)
@@ -73,5 +75,30 @@ mod tests {
 
         // prove and verify
         prove_and_verify(&urs, &circuit_keys, &tuples);
+    }
+
+    #[test]
+    fn download_towns_of_blobs() -> Result<()> {
+        snarkvm_parameters::testnet3::Degree16::load_bytes()?;
+        snarkvm_parameters::testnet3::Degree17::load_bytes()?;
+        snarkvm_parameters::testnet3::Degree18::load_bytes()?;
+        snarkvm_parameters::testnet3::Degree19::load_bytes()?;
+        snarkvm_parameters::testnet3::Degree20::load_bytes()?;
+        snarkvm_parameters::testnet3::Degree21::load_bytes()?;
+        snarkvm_parameters::testnet3::Degree22::load_bytes()?;
+        snarkvm_parameters::testnet3::Degree23::load_bytes()?;
+        snarkvm_parameters::testnet3::Degree24::load_bytes()?;
+
+        snarkvm_parameters::testnet3::ShiftedDegree16::load_bytes()?;
+        snarkvm_parameters::testnet3::ShiftedDegree17::load_bytes()?;
+        snarkvm_parameters::testnet3::ShiftedDegree18::load_bytes()?;
+        snarkvm_parameters::testnet3::ShiftedDegree19::load_bytes()?;
+        snarkvm_parameters::testnet3::ShiftedDegree20::load_bytes()?;
+        snarkvm_parameters::testnet3::ShiftedDegree21::load_bytes()?;
+        snarkvm_parameters::testnet3::ShiftedDegree22::load_bytes()?;
+        snarkvm_parameters::testnet3::ShiftedDegree23::load_bytes()?;
+        snarkvm_parameters::testnet3::ShiftedDegree24::load_bytes()?;
+
+        Ok(())
     }
 }

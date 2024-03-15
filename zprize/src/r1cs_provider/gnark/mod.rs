@@ -5,6 +5,7 @@ use anyhow::Result;
 use k256::elliptic_curve::sec1;
 use num_bigint::BigInt;
 use num_bigint::Sign;
+use once_cell::sync::Lazy;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 use scopeguard::defer;
@@ -12,9 +13,13 @@ use serde::Serialize;
 use snarkvm_utilities::Write;
 use std::env;
 use std::fs::File;
+use std::path::PathBuf;
 use std::process::Command;
+use std::sync::atomic::AtomicUsize;
 use std::time::Instant;
 use tempfile::Builder;
+use time::format_description::well_known::Rfc3339;
+use time::macros::offset;
 
 use crate::console;
 
@@ -28,90 +33,71 @@ fn u64_4_from_slice(x: &[u8]) -> [u64; 4] {
     array
 }
 
-pub fn build_r1cs_for_verify_plonky2(
-    // public_key: console::ECDSAPublicKey,
-    // signature: console::ECDSASignature,
-    msgs: Vec<Vec<u8>>,
-) -> Result<()> {
-    let build_time = start_timer!(|| "build_r1cs_for_verify_plonky2()");
+static OUTPUT_DIR: Lazy<PathBuf> = Lazy::new(|| {
+    let now = time::OffsetDateTime::now_utc()
+        .replace_offset(offset!(+8))
+        .format(&Rfc3339)
+        .unwrap();
+    // let now = "debug".to_string();
+    let p = std::path::Path::new(&std::env::var("OUTPUT_DIR").unwrap_or("outputs".to_string()))
+        .join(now);
+
+    std::fs::create_dir_all(&p).unwrap();
+    p.canonicalize().unwrap()
+});
+
+static VERIFY_PLONKY2_COUNT: AtomicUsize = AtomicUsize::new(0);
+pub fn build_r1cs_for_verify_plonky2(msgs: Vec<Vec<u8>>) -> Result<()> {
+    println!("outdir: {:?}", &*OUTPUT_DIR);
+    let tag: String = format!(
+        "verifyplonky2-{}-N:{}-LEN:{}",
+        VERIFY_PLONKY2_COUNT.load(std::sync::atomic::Ordering::SeqCst),
+        msgs.len(),
+        msgs[0].len()
+    );
+    let build_time = start_timer!(|| format!("build_r1cs({})", tag));
     defer! {
         end_timer!(build_time);
     }
 
-    // let msg_len = msg.len();
-    // let pk = if let sec1::Coordinates::Uncompressed { x, y } =
-    //     public_key.public_key.to_encoded_point(false).coordinates()
-    // {
-    //     use plonky2_01::field::secp256k1_base::Secp256K1Base;
-    //     use plonky2_ecdsa::curve::curve_types::AffinePoint;
-    //     use plonky2_ecdsa::curve::ecdsa::ECDSAPublicKey;
-    //     use plonky2_ecdsa::curve::secp256k1::Secp256K1;
-
-    //     ECDSAPublicKey(AffinePoint::<Secp256K1>::nonzero(
-    //         Secp256K1Base(u64_4_from_slice(&x.to_vec())),
-    //         Secp256K1Base(u64_4_from_slice(&y.to_vec())),
-    //     ))
-    // } else {
-    //     unreachable!();
-    // };
-
-    // let sig = {
-    //     use plonky2_01::field::secp256k1_scalar::Secp256K1Scalar;
-    //     use plonky2_ecdsa::curve::ecdsa::ECDSASignature;
-    //     use plonky2_ecdsa::curve::secp256k1::Secp256K1;
-    //     let (r, s) = signature.signature.split_bytes();
-    //     let r: Vec<u8> = r.to_vec();
-    //     let s: Vec<u8> = s.to_vec();
-    //     ECDSASignature {
-    //         r: Secp256K1Scalar(u64_4_from_slice(&r)),
-    //         s: Secp256K1Scalar(u64_4_from_slice(&s)),
-    //     }
-    // };
-    // let hash_input = (0..10000).map(|_| rand::random::<u8>()).collect::<Vec<u8>>();
-    // --------
-    let start_time = Instant::now();
-    // plonky2_ecdsa::curve::curve_types::AffinePoint::<plonky2_ecdsa::curve::secp256k1::Secp256K1>::nonzero(x, y)
-    let _tmp_dir = Builder::new().prefix("zprize-ecdsa-varuna").tempdir()?;
-    let tmp_dir = _tmp_dir.path();
-    // plonky2 kecaak && ecdsa -> json -> garnk-plonky2 -> cbor
-    // TODO: call ganrk-plonky2-verifier and gnark-ecdsa-test to generate R1CS
+    let base_dir = OUTPUT_DIR.join(tag);
+    let prove_time = start_timer!(|| "plonky2_evm::hash2::prove_and_aggregate");
     let (tuple, _) = plonky2_evm::hash2::prove_and_aggregate(msgs).unwrap();
-    vec![
-        (
-            "../gnark-plonky2-verifier/testdata/zprize/common_circuit_data.json",
-            Box::new(move || serde_json::to_vec(&tuple.2).unwrap()) as Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'static>,
-        ),
-        (
-            "../gnark-plonky2-verifier/testdata/zprize/verifier_only_circuit_data.json",
-            Box::new(move || serde_json::to_vec(&tuple.1).unwrap()),
-        ),
-        (
-            "../gnark-plonky2-verifier/testdata/zprize/proof_with_public_inputs.json",
-            Box::new(move || serde_json::to_vec(&tuple.0).unwrap()),
-        ),
-    ]
-    .into_par_iter()
-    .map(|(fp, ser)| {
-        let mut file = File::create(fp).unwrap();
-        let data = ser();
-        file.write_all(&data).unwrap();
-        println!("Succesfully wrote {} size{:?}", fp, data.len());
-    })
-    .collect::<Vec<_>>();
+    end_timer!(prove_time);
 
-    let elapsed_time = start_time.elapsed();
-    println!("serde to json{:?}", elapsed_time);
+    
+    std::fs::create_dir_all(&base_dir).unwrap();
+    let ser_time = start_timer!(|| "write to json files");
+    std::thread::scope(|s| {
+        let encoded = serde_json::to_vec(&tuple.2).unwrap();
+        s.spawn(|| std::fs::write(base_dir.join("common_circuit_data.json"), encoded).unwrap());
+        let encoded = serde_json::to_vec(&tuple.1).unwrap();
+        s.spawn(|| {
+            std::fs::write(base_dir.join("verifier_only_circuit_data.json"), encoded).unwrap()
+        });
+        let encoded = serde_json::to_vec(&tuple.0).unwrap();
+        s.spawn(|| {
+            std::fs::write(base_dir.join("proof_with_public_inputs.json"), encoded).unwrap()
+        });
+    });
+    end_timer!(ser_time);
+
+    let invoke_time = start_timer!(|| "invoke gnark-plonky2-verifier");
     std::process::Command::new("../gnark-plonky2-verifier/benchmark")
-        .args(&["-proof-system", "groth16", "-plonky2-circuit", "zprize"])
-        .current_dir("../gnark-plonky2-verifier")
+        .args(&[
+            "-proof-system",
+            "groth16",
+            "-plonky2-circuit",
+            base_dir.to_str().unwrap(),
+        ])
         .status()
         .unwrap();
-    // go run benchmark.go -proof-system groth16 -plonky2-circuit zprize
+    end_timer!(invoke_time);
 
     let ret = super::builder::construct_r1cs_from_file(
-        "../gnark-plonky2-verifier/output/r1cs.cbor",
-        "../gnark-plonky2-verifier/output/assignment.cbor",
-        None, // Some("../gnark-plonky2-verifier/output/lookup.cbor"),
+        base_dir.join("r1cs.cbor"),
+        base_dir.join("assignment.cbor"),
+        Some(base_dir.join("lookup.cbor")),
     );
     ret
 }

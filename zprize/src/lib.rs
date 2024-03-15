@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::BTreeMap;
+
 use aleo_std_profiler::{end_timer, start_timer};
 use k256::ecdsa::{Signature, VerifyingKey};
 use snarkvm_algorithms::{
@@ -28,7 +30,7 @@ pub mod r1cs_provider;
 
 // Config code here for testing KECCAK or ECDSA only
 pub const ENABLE_CIRCUIT_FOR_KECCAK: bool = true;
-pub const ENABLE_CIRCUIT_FOR_ECDSA: bool = true;
+pub const ENABLE_CIRCUIT_FOR_ECDSA: bool = false;
 
 /// A (public key, msg, signature) tuple.
 pub type Tuples<'a> = &'a [(VerifyingKey, Vec<u8>, Signature)];
@@ -66,6 +68,8 @@ mod tests {
     use super::*;
 
     use anyhow::Result;
+
+
 
     #[test]
     fn it_works() {

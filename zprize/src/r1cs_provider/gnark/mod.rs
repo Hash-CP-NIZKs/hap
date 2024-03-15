@@ -94,11 +94,13 @@ pub fn build_r1cs_for_verify_plonky2(msgs: Vec<Vec<u8>>) -> Result<()> {
         .unwrap();
     end_timer!(invoke_time);
 
+    let construct_r1cs_from_file = start_timer!(|| "construct_r1cs_from_file");
     let ret = super::builder::construct_r1cs_from_file(
         base_dir.join("r1cs.cbor"),
         base_dir.join("assignment.cbor"),
         Some(base_dir.join("lookup.cbor")),
     );
+    end_timer!(construct_r1cs_from_file);
     ret
 }
 // input: 50 * data

@@ -27,7 +27,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let run_type = CircuitRunType::RunKeccakThenEcdsa;
 
     // setup
-    let urs = zprize::api::setup(3812277, 7685631, 1698481);
+    let urs = zprize::api::setup(1000, 1000, 1000);
 
     // we generate 50 tuples for each bench
     // tuple = (public key, message, signature)

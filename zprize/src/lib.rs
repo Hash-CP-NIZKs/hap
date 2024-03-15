@@ -28,12 +28,17 @@ pub mod circuit;
 pub mod console;
 pub mod r1cs_provider;
 
+/// We have define a enum to control how to run the circuits
 #[derive(Debug, Copy, Clone)]
 pub enum CircuitRunType {
+    /// Run the keccak circuits only
     RunKeccakOnly,
+    /// Run the ecdsa circuits only
     RunEcdsaOnly,
-    RunKeccakAndEcdsa,  /* In one prove_batch() */
-    RunKeccakThenEcdsa, /* Run keccak prove_batch() and then ecdsa prove_batch() */
+    /// Run both keccak circuits and ecdsa circuits in one prove_batch()
+    RunKeccakAndEcdsa,
+    /// In this option, we prove keccak and ecdsa separately, first running prove_batch() for keccak circuits, then running prove_batch() for ecdsa circuits.
+    RunKeccakThenEcdsa,
 }
 
 /// A (public key, msg, signature) tuple.
@@ -113,8 +118,6 @@ mod tests {
 
     use anyhow::Result;
 
-
-
     #[test]
     fn it_works() {
         // Config code here for testing KECCAK or ECDSA only
@@ -130,7 +133,7 @@ mod tests {
         let tuples = console::generate_signatures(msg_len, num);
 
         // setup
-        let urs = api::setup(3812277, 7685631, 1698481);
+        let urs = api::setup(1000, 1000, 1000);
         let circuit_keys = api::compile(run_type, &urs, num, msg_len);
 
         // prove and verify

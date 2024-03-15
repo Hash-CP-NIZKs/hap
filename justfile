@@ -1,7 +1,6 @@
 setup:
     git submodule update --init --recursive
     go env -w GO111MODULE=on
-    go env -w GOPROXY=https://goproxy.cn,direct
     cd gnark-ecdsa-test && go mod download
     cd gnark-plonky2-verifier && go mod download
     cd zprize && cargo check

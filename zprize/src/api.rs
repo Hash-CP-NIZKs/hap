@@ -196,7 +196,7 @@ pub fn compile(
         unique_circuits.push(ecdsa_circuit);
     }
 
-    if !matches!(run_type, CircuitRunType::RunKeccakThenEcdsa) {
+    if matches!(run_type, CircuitRunType::RunKeccakThenEcdsa) {
         /* If it is RunKeccakThenEcdsa, we have to run batch_circuit_setup() for keccak and ecdsa separately. */
         let mut r0 = VarunaInst::batch_circuit_setup(&urs, &[&unique_circuits[0]])
             .with_context(|| format!("VarunaInst::batch_circuit_setup() for circuit: keccak"))

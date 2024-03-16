@@ -53,7 +53,7 @@ pub fn prove_and_verify(
     )],
     tuples: Tuples,
 ) {
-    println!("compile({run_type:?}) tuple_num: {}", tuples.len());
+    println!("prove_and_verify({run_type:?}) tuple_num: {} msg_len: {}", tuples.len(), tuples[0].1.len());
 
     if matches!(run_type, CircuitRunType::RunKeccakThenEcdsa) {
         /* First, we run prove and verify for keccak only, then run for ecdsa only */

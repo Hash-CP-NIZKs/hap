@@ -115,7 +115,7 @@ pub fn compile(
     CircuitProvingKey<Bls12_377, VarunaHidingMode>,
     CircuitVerifyingKey<Bls12_377>,
 )> {
-    println!("compile({run_type:?}) tuple_num: {tuple_num} msg_len: {msg_len})");
+    println!("compile({run_type:?}) tuple_num: {tuple_num} msg_len: {msg_len}");
 
     /* Sample some tuples */
     let msg = console::sample_msg(msg_len);

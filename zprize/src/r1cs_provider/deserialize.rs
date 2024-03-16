@@ -22,9 +22,8 @@ pub struct Constraint {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Assignment {
-    pub variables: Vec<BigInt>,
-    pub primary_input_size: usize, /* number of public */
-    pub auxiliary_input_size: usize,
+    pub variables: Vec<BigInt>, /* values in the witness, the first element "1" is also included */
+    pub num_public_inputs: usize, /* number of public, include the first element "1" */
 }
 
 #[derive(Debug, Serialize, Deserialize)]

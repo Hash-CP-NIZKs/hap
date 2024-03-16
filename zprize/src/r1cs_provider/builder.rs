@@ -42,18 +42,26 @@ pub(crate) fn construct_r1cs_from_file(
     let (r1cs, assignment, lookup) =
         deserialize::parse_file(r1cs_file, assignment_file, lookup_file)?;
 
-    let mut fields = assignment
+    let fields = assignment
         .variables
         .iter()
-        .map(|variable| {
-            Ok(F::new(
-                Mode::Public,
-                snarkvm_console::types::Field::new(EF::from(variable)),
-            ))
+        .enumerate()
+        .map(|(id, variable)| {
+            if id == 0 {
+                // Insert the first element `1`
+                F::from(Env::one())
+            } else {
+                F::new(
+                    if id < assignment.num_public_inputs {
+                        Mode::Public
+                    } else {
+                        Mode::Private
+                    },
+                    snarkvm_console::types::Field::new(EF::from(variable)),
+                )
+            }
         })
-        .collect::<Result<Vec<_>>>()?;
-    // insert first element `1`
-    fields.insert(0, F::from(Env::one()));
+        .collect::<Vec<_>>();
 
     let func_convert_lc = |lc: &HashMap<usize, BigInt>| -> Result<_> {
         // create Field<Env> from libsnark's linear_combination

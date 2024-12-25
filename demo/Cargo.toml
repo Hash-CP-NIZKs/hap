@@ -14,7 +14,6 @@ snarkvm-circuit-environment = { git = "https://github.com/AleoHQ/snarkVM", branc
 snarkvm-console-network = { git = "https://github.com/AleoHQ/snarkVM", branch = "zprize_2023" }
 snarkvm-utilities = { git = "https://github.com/AleoHQ/snarkVM", branch = "zprize_2023" }
 snarkvm-parameters = { git = "https://github.com/AleoHQ/snarkVM", branch = "zprize_2023" }
-plonky2_evm = { path = "../evm/evm" }
 rand = "0.8.5"
 k256 = { version = "0.13", features = ["ecdsa"] }
 ecdsa = { version = "0.16", features = ["signing", "verifying"] }
@@ -26,12 +25,11 @@ serde_json = "1"
 anyhow = "1.0.79"
 hex = "0.4.3"
 aleo-std-profiler = { version = "0.1.15", features = ["profiler"]} # enable "profiler" feature for this crate, which is depended by snarkVM
+# aleo-std-profiler = { version = "0.1.15", features = []}
 
 tempfile = "3.9.0"
 scopeguard = "1.2.0"
 num-bigint = "0.4.4"
-plonky2_ecdsa = {path = "../plonky2-ecdsa" }
-plonky2_01 = { git = "ssh://git@github.com/zproof/evm.git", branch = "v012",  package = "plonky2" }
 rayon = "1.8"
 once_cell = "1.19.0"
 time = {version = "0.3", features = ["formatting","local-offset","macros"]}
@@ -47,7 +45,6 @@ snarkvm-utilities = { path = '../snarkVM/utilities' }
 snarkvm-parameters = { path = '../snarkVM/parameters' }
 
 [patch.crates-io]
-plonky2 = { git = "ssh://git@github.com/zproof/evm.git", branch = "v012" }
 aleo-std-profiler = { path = '../aleo-std/profiler' }
 
 [dev-dependencies]

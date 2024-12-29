@@ -24,8 +24,8 @@
 4. Clone this project and setup
 
     ```sh
-    git clone --recursive git@github.com:zproof/zprize-ecdsa-varuna.git
-    cd zprize-ecdsa-varuna
+    git clone --recursive git@github.com:zk-hap/hap.git
+    cd hap
     just setup
     just build-gnark
     ```
@@ -35,7 +35,7 @@
     Before the first time you generate proof with this project, it would be better to download some of Aleo's blobs in advance. Those files are required by snarkVM, and they will be saved at `~/.aleo`.
 
     ```sh
-    cargo test --package zprize --lib -- tests::download_tons_of_blobs --exact --nocapture
+    cargo test --manifest-path demo/Cargo.toml --lib -- tests::download_tons_of_blobs --exact --nocapture
     ```
 
     Note this is a one-time operation, and you only need to call this once.
@@ -46,7 +46,7 @@
 Run the bench with:
 
 ```sh
-cargo bench
+cargo bench --manifest-path demo/Cargo.toml
 ```
 
 We have enabled "profiler" feature of `aleo-std-profiler` crate, so that we can get detailed time during the proving process. 

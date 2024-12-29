@@ -13,83 +13,29 @@
 // limitations under the License.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use zprize::CircuitRunType;
+use demo::TestCase;
 
 fn criterion_benchmark(c: &mut Criterion) {
+    env_logger::builder().is_test(true).try_init().unwrap();
+
     let mut group = c.benchmark_group("Proof creation");
     group
         .sample_size(10)
         .sampling_mode(criterion::SamplingMode::Flat); // for slow benchmarks
 
-    // let run_type = CircuitRunType::RunKeccakOnly;
-    // let run_type = CircuitRunType::RunEcdsaOnly;
-    // let run_type = CircuitRunType::RunKeccakAndEcdsa;
-    let run_type = CircuitRunType::RunKeccakThenEcdsa;
-
     // setup
-    let urs = zprize::api::setup(1000, 1000, 1000);
+    let urs = demo::api::setup(1000, 1000, 1000);
 
-    // we generate 50 tuples for each bench
-    // tuple = (public key, message, signature)
-    let num = 50;
+    // We run 64 times for each batch
+    let batch_num = 64;
 
-    // 100 bytes
-    let msg_len = 100;
-    let small_tuples = zprize::console::generate_signatures(msg_len, num);
-    let small_circuit_keys = zprize::api::compile(run_type, &urs, num, msg_len);
-
-    // 1,000 bytes
-    let msg_len = 1000;
-    let medium_tuples = zprize::console::generate_signatures(msg_len, num);
-    let medium_circuit_keys = zprize::api::compile(run_type, &urs, num, msg_len);
-
-    // 50,000 bytes
-    let msg_len = 50000;
-    let large_tuples = zprize::console::generate_signatures(msg_len, num);
-    let large_circuit_keys = zprize::api::compile(run_type, &urs, num, msg_len);
-
-    //
-    // WARNING
-    // =======
-    //
-    // Do not modify anything above this line.
-    // Everything after this line should be fairgame,
-    // as long as proofs verify.
-    //
+    let test_case = TestCase::Test1;
+    let circuit_keys = demo::api::compile(test_case, &urs);
 
     group.bench_function("small message", |b| {
         b.iter(|| {
             // prove all tuples
-            zprize::prove_and_verify(
-                run_type,
-                &urs,
-                &small_circuit_keys,
-                black_box(&small_tuples),
-            );
-        })
-    });
-
-    group.bench_function("medium message", |b| {
-        b.iter(|| {
-            // prove all tuples
-            zprize::prove_and_verify(
-                run_type,
-                &urs,
-                &medium_circuit_keys,
-                black_box(&medium_tuples),
-            );
-        })
-    });
-
-    group.bench_function("large message", |b| {
-        b.iter(|| {
-            // prove all tuples
-            zprize::prove_and_verify(
-                run_type,
-                &urs,
-                &large_circuit_keys,
-                black_box(&large_tuples),
-            );
+            demo::prove_and_verify(test_case, &urs, &circuit_keys, black_box(batch_num));
         })
     });
 }

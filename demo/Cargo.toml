@@ -16,8 +16,8 @@ snarkvm-curves = {git = "https://github.com/AleoHQ/snarkVM", branch = "zprize_20
 snarkvm-parameters = {git = "https://github.com/AleoHQ/snarkVM", branch = "zprize_2023"}
 snarkvm-utilities = {git = "https://github.com/AleoHQ/snarkVM", branch = "zprize_2023"}
 
-aleo-std-profiler = {version = "0.1.15", features = ["profiler"]}# enable "profiler" feature for this crate, which is depended by snarkVM
-# aleo-std-profiler = { version = "0.1.15", features = []}
+# aleo-std-profiler = {version = "0.1.15", features = ["profiler"]}# enable "profiler" feature for this crate, which is depended by snarkVM
+aleo-std-profiler = { version = "0.1.15", features = []}
 anyhow = "1.0.79"
 hex = "0.4.3"
 serde = "1.0"

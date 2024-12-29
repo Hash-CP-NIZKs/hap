@@ -46,7 +46,11 @@
 Run the bench with:
 
 ```sh
-cargo bench --manifest-path demo/Cargo.toml
+cd demo
+cargo bench test1
+# or
+# cargo bench test2
+# cargo bench test3
 ```
 
 We have enabled "profiler" feature of `aleo-std-profiler` crate, so that we can get detailed time during the proving process. 

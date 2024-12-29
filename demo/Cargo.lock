@@ -45,9 +45,6 @@ checksum = "7527351aa675fdbe6a1902de3cf913ff7d50ccd6822f1562be374bdd85eaefb8"
 [[package]]
 name = "aleo-std-profiler"
 version = "0.1.15"
-dependencies = [
- "colored",
-]
 
 [[package]]
 name = "aleo-std-storage"

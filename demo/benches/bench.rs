@@ -14,11 +14,16 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use demo::TestCase;
+use log::{info, LevelFilter};
 
 fn criterion_benchmark(c: &mut Criterion) {
-    env_logger::builder().is_test(true).try_init().unwrap();
+    env_logger::builder()
+        .filter_level(LevelFilter::Info)
+        .is_test(true)
+        .try_init()
+        .unwrap();
 
-    let mut group = c.benchmark_group("Proof creation");
+    let mut group = c.benchmark_group("proof_and_verify");
     group
         .sample_size(10)
         .sampling_mode(criterion::SamplingMode::Flat); // for slow benchmarks
@@ -29,15 +34,22 @@ fn criterion_benchmark(c: &mut Criterion) {
     // We run 64 times for each batch
     let batch_num = 64;
 
-    let test_case = TestCase::Test1;
-    let circuit_keys = demo::api::compile(test_case, &urs);
-
-    group.bench_function("small message", |b| {
-        b.iter(|| {
-            // prove all tuples
-            demo::prove_and_verify(test_case, &urs, &circuit_keys, black_box(batch_num));
-        })
-    });
+    for test_case in [TestCase::Test1, TestCase::Test2, TestCase::Test3] {
+        let name = match test_case {
+            TestCase::Test1 => "test1",
+            TestCase::Test2 => "test2",
+            TestCase::Test3 => "test3",
+        };
+        group.bench_function(name, |b| {
+            b.iter(|| {
+                info!("---------------- round begin ----------------");
+                let circuit_keys = demo::api::compile(test_case, &urs);
+                // prove all tuples
+                demo::prove_and_verify(test_case, &urs, &circuit_keys, black_box(batch_num));
+                info!("---------------- round end   ----------------");
+            })
+        });
+    }
 }
 
 criterion_group!(benches, criterion_benchmark);

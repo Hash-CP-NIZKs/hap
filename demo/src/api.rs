@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use aleo_std_profiler::{end_timer, start_timer};
 use anyhow::Context;
 use log::{debug, info};
 use rand::rngs::OsRng;
@@ -31,7 +30,7 @@ use snarkvm_circuit_environment::SameCircuitAssignment;
 use snarkvm_console::{network::Testnet3 as Network, program::Itertools};
 use snarkvm_console_network::Network as _;
 use snarkvm_curves::bls12_377::{Bls12_377, Fq, Fr};
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc, time::Instant};
 
 use crate::{r1cs_provider, TestCase};
 
@@ -155,8 +154,12 @@ pub fn prove(
     let rng = &mut OsRng::default();
     let universal_prover = urs.to_universal_prover().unwrap();
     let fiat_shamir = Network::varuna_fs_parameters();
+
+    let start = Instant::now();
     let proof =
         VarunaInst::prove_batch(&universal_prover, fiat_shamir, &pks_to_constraints, rng).unwrap();
+    let duration = start.elapsed();
+    info!("Compute the proof finished ({duration:?})");
 
     /* Prepare inputs for verifier, this should be verify fast since it is just memory copy ... */
     info!("Prepare inputs for verifier");
@@ -188,7 +191,9 @@ pub fn verify_proof(
     let universal_verifier = urs.to_universal_verifier().unwrap();
 
     // Note: same comment here, verify_batch could verify several proofs instead of one ;)
-    let time = start_timer!(|| "Run VarunaInst::verify_batch()");
+    info!("Verify the proof");
+    let start = Instant::now();
     VarunaInst::verify_batch(&universal_verifier, fiat_shamir, vks_to_inputs, proof).unwrap();
-    end_timer!(time);
+    let duration = start.elapsed();
+    info!("Verify the proof finished ({duration:?})");
 }
